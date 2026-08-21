@@ -253,7 +253,7 @@ export class DataSource extends Disposable {
 	 * @param stashes An array of all stashes in the repository.
 	 * @param gerritRefs The list of Gerrit change refs allowed into the graph (NULL => Gerrit integration disabled).
 	 * @param gerritShowChangeRefs Should the Gerrit change refs (refs/remotes/<remote>/changes/*) be displayed as remote branch refs.
-	 * @param filterPath Only show commits that modified the file(s) at this path (relative to the repository root), or NULL (no path filter).
+	 * @param filterPath Only show commits that modified the file(s) at this path (relative to the repository root; multiple comma-separated paths match commits changing ANY of them), or NULL (no path filter).
 	 * @param deferUncommittedChanges Skip computing the "Uncommitted Changes" row (which requires a
 	 * `git status` that can be slow on large working trees). Use this to render the graph
 	 * immediately, and fetch the uncommitted changes status separately afterwards.
@@ -636,8 +636,47 @@ export class DataSource extends Disposable {
 		});
 	}
 
+	/**
+	 * Get the unified diff of a single file between two revisions (used by the Commit Comparison View).
+	 * @param repo The path of the repository.
+	 * @param fromHash The revision the diff is from.
+	 * @param toHash The revision the diff is to ('' compares against the working tree).
+	 * @param oldFilePath The relative path of the file on the from-side.
+	 * @param newFilePath The relative path of the file on the to-side (differs when renamed).
+	 * @returns The unified diff output.
+	 */
+	public getCommitFileDiff(repo: string, fromHash: string, toHash: string, oldFilePath: string, newFilePath: string) {
+		if (toHash === UNCOMMITTED) toHash = '';
+		const args = ['diff', '--no-color', '--find-renames', fromHash];
+		if (toHash !== '') args.push(toHash);
+		args.push('--');
+		if (oldFilePath !== newFilePath) args.push(oldFilePath);
+		args.push(newFilePath);
+		return this.spawnGit(args, repo, stdout => stdout);
+	}
+
 
 	/* Get Data Methods - General */
+
+	/**
+	 * Get a lightweight summary (hash, author, date, full message) of each of the given commits,
+	 * used by the Commit Comparison View to describe the two commits being compared.
+	 * @param repo The path of the repository.
+	 * @param commitHashes The hashes of the commits to summarise.
+	 * @returns A map of commit hash to summary, or NULL if an error occurred.
+	 */
+	public getCommitSummaries(repo: string, commitHashes: string[]): Promise<{ [hash: string]: { hash: string, author: string, email: string, date: number, message: string } } | null> {
+		return this.spawnGit(['show', '--quiet', '--format=%H%x1f%an%x1f%ae%x1f%at%x1f%B%x1e'].concat(commitHashes), repo, (stdout) => {
+			const summaries: { [hash: string]: { hash: string, author: string, email: string, date: number, message: string } } = {};
+			for (const record of stdout.replace(/\x1e\s*$/, '').split('\x1e')) {
+				const parts = record.trim().split('\x1f');
+				if (parts.length === 5) {
+					summaries[parts[0]] = { hash: parts[0], author: parts[1], email: parts[2], date: parseInt(parts[3], 10), message: parts[4].trim() };
+				}
+			}
+			return summaries;
+		}).catch(() => null);
+	}
 
 	/**
 	 * Get the subject of a commit.
@@ -1736,8 +1775,9 @@ export class DataSource extends Disposable {
 		const args = ['-c', 'log.showSignature=false', 'log', '--no-walk', '--format=%H%x1f%B%x1e', ...hashes];
 		return this.spawnGit(args, repo, (stdoutBuf) => {
 			const bodies: { [hash: string]: string } = {};
-			const text = stdoutBuf.toString().replace(/\x1e$/, ''); // trim trailing record separator
-			for (const record of text.split('\x1e')) {
+			const text = stdoutBuf.toString();
+			for (let record of text.split('\x1e')) {
+				record = record.replace(/^\n/, ''); // git terminates each formatted entry with a newline
 				const sep = record.indexOf('\x1f');
 				if (sep <= 0) continue;
 				bodies[record.substring(0, sep)] = record.substring(sep + 1).replace(/\n$/, '');
@@ -1872,6 +1912,37 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Count the commits reachable from the currently shown refs but NOT from the given hash, i.e.
+	 * the number of commits newer than it. Used by the webview to jump directly to a pinned commit
+	 * with a single loadCommits request instead of paging through the history. The count
+	 * deliberately ignores the author / path filters, so it is an upper bound of the commit's
+	 * position in the view — loading this many commits is always sufficient to include it.
+	 * @param repo The path of the repository.
+	 * @param branches The currently shown branches, or NULL (show all).
+	 * @param hash The full hash of the commit to jump to.
+	 * @param showRemoteBranches Are remote branches shown.
+	 * @param includeCommitsMentionedByReflogs Are commits mentioned by reflogs shown.
+	 * @returns The number of commits before the hash, or NULL if the hash is unknown to Git.
+	 */
+	public countCommitsBefore(repo: string, branches: ReadonlyArray<string> | null, hash: string, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean): Promise<number | null> {
+		const refs = branches === null ? null : branches.filter((branch) => isSafeRefName(branch) || isValidCommitHash(branch) || branch.startsWith('--glob='));
+		const args = ['rev-list', '--count'];
+		if (refs !== null) {
+			args.push(...refs);
+		} else {
+			args.push('--branches', '--tags');
+			if (showRemoteBranches) args.push('--remotes');
+			if (includeCommitsMentionedByReflogs) args.push('--reflog');
+			args.push('HEAD');
+		}
+		args.push('^' + hash);
+		return this.spawnGit(args, repo, (stdout) => {
+			const count = parseInt(stdout.trim(), 10);
+			return isNaN(count) ? null : count;
+		}).catch(() => <number | null>null);
+	}
+
+	/**
 	 * Get the raw commits in a repository.
 	 * @param repo The path of the repository.
 	 * @param refs The list of branch/tag heads to display, or NULL (show all).
@@ -1940,10 +2011,12 @@ export class DataSource extends Disposable {
 			args.push('--full-history', '--simplify-merges');
 		}
 		args.push('--');
-		// The filter path is already after the `--` pathspec separator, so it cannot be
-		// misinterpreted as a git option
+		// The filter paths are already after the `--` pathspec separator, so they cannot be
+		// misinterpreted as git options. Multiple comma-separated paths (as produced by filtering
+		// by multiple selected files) become separate pathspecs: commits modifying ANY of them are
+		// shown. Whitespace around each path is trimmed (e.g. "a, b" typed in the filter dialog)
 		if (filterPath !== null && filterPath !== '') {
-			args.push(filterPath);
+			args.push(...filterPath.split(',').map((p) => p.trim()).filter((p) => p !== ''));
 		}
 
 		return this.spawnGit(args, repo, (stdoutBuf) => {

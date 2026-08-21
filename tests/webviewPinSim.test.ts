@@ -248,6 +248,67 @@ describe('Webview pin simulation', () => {
 		expect(scrollCalls).not.toContain('view');
 	});
 
+	test('clicking a pinned commit chip beyond the loaded range jumps straight to it via countCommitsBefore', () => {
+		const FAR_HASH = '9999aaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+		const COMMIT_FAR = { hash: FAR_HASH, parents: [], heads: [], tags: [], remotes: [], stash: null, author: 'Dev', email: 'dev@example.com', date: 1753000000, message: 'far away commit' };
+		loadWebview(makeState([{ hash: FAR_HASH, summary: 'far away commit' }]));
+		respondToInitialLoad([COMMIT_OTHER]);
+
+		// Re-deliver the initial load with moreCommitsAvailable: true (history extends beyond the loaded range)
+		const firstLoadMsg = sentMessages.filter((m) => m.command === 'loadCommits').pop();
+		window.dispatchEvent(new MessageEvent('message', { data: {
+			command: 'loadCommits', refreshId: firstLoadMsg.refreshId, error: null, head: 'main', tags: [],
+			moreCommitsAvailable: true, onlyFollowFirstParent: false, gerritStates: [], commits: [COMMIT_OTHER]
+		} }));
+
+		const chip = Array.from(document.querySelectorAll('.pinnedChip')).find((c: any) => c.dataset.type === 'commit') as any;
+		chip.click();
+
+		// The webview asks the extension how many commits precede the pinned commit
+		const countMsg = sentMessages.filter((m) => m.command === 'countCommitsBefore').pop();
+		expect(countMsg).toBeDefined();
+		expect(countMsg.hash).toBe(FAR_HASH);
+
+		// The extension answers: the commit is 1200 commits back
+		window.dispatchEvent(new MessageEvent('message', { data: {
+			command: 'countCommitsBefore', hash: FAR_HASH, count: 1200
+		} }));
+
+		// A single loadCommits request must follow, with maxCommits large enough to include the commit
+		const jumpLoadMsg = sentMessages.filter((m) => m.command === 'loadCommits').pop();
+		expect(jumpLoadMsg).toBeDefined();
+		expect(jumpLoadMsg).not.toBe(firstLoadMsg);
+		expect(jumpLoadMsg.maxCommits).toBeGreaterThanOrEqual(1300);
+
+		// Once the loaded commits include the pinned one, the view scrolls to it
+		window.dispatchEvent(new MessageEvent('message', { data: {
+			command: 'loadCommits', refreshId: jumpLoadMsg.refreshId, error: null, head: 'main', tags: [],
+			moreCommitsAvailable: false, onlyFollowFirstParent: false, gerritStates: [], commits: [COMMIT_OTHER, COMMIT_FAR]
+		} }));
+		expect(scrollCalls).toContain('view');
+	});
+
+	test('clicking a pinned commit chip whose hash is unknown to Git shows an error instead of loading', () => {
+		loadWebview(makeState([{ hash: 'ffffffffffffffffffffffffffffffffffffffff', summary: 'not loaded' }]));
+		respondToInitialLoad([COMMIT_OTHER]);
+
+		const firstLoadMsg = sentMessages.filter((m) => m.command === 'loadCommits').pop();
+		window.dispatchEvent(new MessageEvent('message', { data: {
+			command: 'loadCommits', refreshId: firstLoadMsg.refreshId, error: null, head: 'main', tags: [],
+			moreCommitsAvailable: true, onlyFollowFirstParent: false, gerritStates: [], commits: [COMMIT_OTHER]
+		} }));
+
+		const chip = Array.from(document.querySelectorAll('.pinnedChip')).find((c: any) => c.dataset.type === 'commit') as any;
+		chip.click();
+
+		// The extension reports the hash is unknown: no further loadCommits request may be made
+		window.dispatchEvent(new MessageEvent('message', { data: {
+			command: 'countCommitsBefore', hash: 'ffffffffffffffffffffffffffffffffffffffff', count: null
+		} }));
+		expect(sentMessages.filter((m) => m.command === 'loadCommits').pop()).toBe(firstLoadMsg);
+		expect(scrollCalls).not.toContain('view');
+	});
+
 	test('pinned branches and commits are restored when the webview is reloaded', () => {
 		loadWebview(makeState([{ hash: PINNED_HASH, summary: 'Fix camera crash' }], ['release/2.0']));
 		respondToInitialLoad([COMMIT_PINNED, COMMIT_OTHER]);

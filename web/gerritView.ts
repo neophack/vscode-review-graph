@@ -288,7 +288,7 @@ function initGerritControls(view: GitGraphView) {
 
 	const controlsRow = view.gerritControlsElem;
 
-	if (controlsRow === null || !view.config.gerrit.enabled) {
+	if (controlsRow === null || !view.config.gerrit.enabled || !view.config.gerrit.showControlsBar) {
 
 		if (controlsRow !== null) controlsRow.style.display = 'none';
 

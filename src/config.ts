@@ -132,6 +132,7 @@ class Config {
 		const statusFilterConfig = this.config.get<any>('gerrit.statusFilter', {}) || {};
 		return {
 			enabled: !!this.config.get('gerrit.enabled', true),
+			showControlsBar: !!this.config.get('gerrit.showControlsBar', true),
 			remote: this.config.get<string>('gerrit.remote', 'origin'),
 			fetchMode: fetchMode === 'off' ? 'off' : (fetchMode === 'all' ? 'all' : 'latest'),
 			fetchLimit: this.config.get<number>('gerrit.fetchLimit', 20),

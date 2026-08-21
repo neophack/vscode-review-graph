@@ -561,7 +561,63 @@ describe('DataSource', () => {
 			});
 		});
 	});
+	describe('countCommitsBefore', () => {
+		it('Should count the commits newer than the hash when showing all branches', async () => {
+			// Setup
+			mockGitSuccessOnce('1200\n');
+
+			// Run
+			const count = await dataSource.countCommitsBefore('/path/to/repo', null, 'e83bd8dbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', true, false);
+
+			// Assert
+			expect(count).toBe(1200);
+			const args = spyOnSpawn.mock.calls[spyOnSpawn.mock.calls.length - 1][1];
+			expect(args.slice(0, args.length - 1)).toEqual(['rev-list', '--count', '--branches', '--tags', '--remotes', 'HEAD']);
+			expect(args[args.length - 1]).toBe('^e83bd8dbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+		});
+
+		it('Should count from the selected branches only', async () => {
+			// Setup
+			mockGitSuccessOnce('42\n');
+
+			// Run
+			const count = await dataSource.countCommitsBefore('/path/to/repo', ['main', 'develop'], 'e83bd8dbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', false, false);
+
+			// Assert
+			expect(count).toBe(42);
+			const args = spyOnSpawn.mock.calls[spyOnSpawn.mock.calls.length - 1][1];
+			expect(args).toEqual(['rev-list', '--count', 'main', 'develop', '^e83bd8dbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']);
+		});
+
+		it('Should return NULL when the hash is unknown to Git', async () => {
+			// Setup
+			mockGitThrowingErrorOnce('fatal: bad revision ^ffffffffffffffffffffffffffffffffffffffff');
+
+			// Run
+			const count = await dataSource.countCommitsBefore('/path/to/repo', null, 'ffffffffffffffffffffffffffffffffffffffff', false, false);
+
+			// Assert
+			expect(count).toBeNull();
+		});
+	});
+
 	describe('getCommits', () => {
+		it('Should split a comma-separated path filter into separate git pathspecs (commits changing ANY of the paths are shown)', async () => {
+			// Run (whitespace around the paths is tolerated, e.g. "a, b" typed in the filter dialog)
+			await dataSource.getCommits('/path/to/repo', null, null, 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], [], null, false, ' src/main.ts , web/main.ts ');
+
+			// Assert: the git log arguments contain the full-history simplification and each path as its own pathspec after `--`
+			const logArgs = spyOnSpawn.mock.calls.map((call: any[]) => call[1]).filter((args: string[]) => args.includes('log') && args.includes('src/main.ts'));
+			expect(logArgs.length).toBeGreaterThan(0);
+			for (const args of logArgs) {
+				const separator = args.indexOf('--');
+				expect(separator).toBeGreaterThan(-1);
+				expect(args.slice(separator + 1)).toEqual(['src/main.ts', 'web/main.ts']);
+				expect(args).toContain('--full-history');
+				expect(args).toContain('--simplify-merges');
+			}
+		});
+
 		it('Should return the commits (show all branches)', async () => {
 			// Setup
 			mockGitSuccessOnce(
@@ -4026,6 +4082,36 @@ describe('DataSource', () => {
 
 			// Assert
 			expect(result).toBe(null);
+		});
+	});
+
+	describe('getCommitBodies', () => {
+		it('Should parse every record of the batch (git terminates each formatted entry with a newline)', async () => {
+			// Setup
+			const hash1 = '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', hash2 = '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c';
+			mockGitSuccessOnce(hash1 + '\x1fsubject one\n\nbody one\n\x1e\n' + hash2 + '\x1fsubject two\n\nbody two\n\x1e\n');
+
+			// Run
+			const result = await dataSource.getCommitBodies('/path/to/repo', [hash1, hash2]);
+
+			// Assert
+			expect(result).toStrictEqual({
+				[hash1]: 'subject one\n\nbody one',
+				[hash2]: 'subject two\n\nbody two'
+			});
+		});
+
+		it('Should ignore invalid commit hashes', async () => {
+			// Setup
+			const hash1 = '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b';
+			mockGitSuccessOnce(hash1 + '\x1fbody one\n\x1e\n');
+
+			// Run
+			const result = await dataSource.getCommitBodies('/path/to/repo', [hash1, 'not-a-hash']);
+
+			// Assert
+			expect(result).toStrictEqual({ [hash1]: 'body one' });
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--no-walk', '--format=%H%x1f%B%x1e', hash1], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 	});
 

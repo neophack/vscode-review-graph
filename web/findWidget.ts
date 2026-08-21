@@ -53,6 +53,9 @@ class FindWidget {
 					keyupTimeout = null;
 					if (this.text !== this.inputElem.value) {
 						this.text = this.inputElem.value;
+						// Matching only sees rows that are in the DOM, so leave windowed rendering
+						// before scanning (a no-op unless the view is currently windowed)
+						this.view.exitWindowedRender();
 						this.clearMatches();
 						this.findMatches(this.getCurrentHash(), true);
 						this.openCommitDetailsViewForCurrentMatchIfEnabled();

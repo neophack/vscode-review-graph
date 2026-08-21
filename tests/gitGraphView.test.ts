@@ -2792,9 +2792,9 @@ describe('GitGraphView', () => {
 					});
 				}
 
-				// Assert (both requests are answered, but Git only ran once)
+				// Assert (both requests are answered, but Git only ran once; the deferred uncommitted-changes follow-ups add further responses, so only the initial deferred responses are counted here)
 				await waitForExpect(() => {
-					expect(messages.filter((m: any) => m.command === 'loadCommits')).toHaveLength(2);
+					expect(messages.filter((m: any) => m.command === 'loadCommits' && m.uncommittedPending === true)).toHaveLength(2);
 				});
 				expect(spyOnGetCommits).toHaveBeenCalledTimes(1);
 
@@ -2818,7 +2818,7 @@ describe('GitGraphView', () => {
 					gerritForceRefresh: true
 				});
 				await waitForExpect(() => {
-					expect(messages.filter((m: any) => m.command === 'loadCommits').some((m: any) => m.refreshId === 4)).toBe(true);
+					expect(messages.filter((m: any) => m.command === 'loadCommits' && m.uncommittedPending === true).some((m: any) => m.refreshId === 4)).toBe(true);
 				});
 				expect(spyOnGetCommits).toHaveBeenCalledTimes(2);
 				spyOnGetCommits.mockRestore();
@@ -2828,6 +2828,7 @@ describe('GitGraphView', () => {
 				// Setup
 				const spyOnGetCommits = jest.spyOn(dataSource, 'getCommits');
 				spyOnGetCommits.mockResolvedValueOnce(getCommitsResolvedValue);
+				jest.spyOn(dataSource, 'getUncommittedChanges').mockResolvedValueOnce(0);
 
 				// Run
 				onDidReceiveMessage({
@@ -2855,6 +2856,7 @@ describe('GitGraphView', () => {
 						{
 							command: 'loadCommits',
 							refreshId: 2,
+							uncommittedPending: true,
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
@@ -2862,6 +2864,17 @@ describe('GitGraphView', () => {
 							onlyFollowFirstParent: false,
 							gerritStates: null,
 							error: getCommitsResolvedValue.error
+						},
+						{
+							command: 'loadCommits',
+							refreshId: 2,
+							commits: getCommitsResolvedValue.commits,
+							head: getCommitsResolvedValue.head,
+							tags: getCommitsResolvedValue.tags,
+							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
+							onlyFollowFirstParent: false,
+							gerritStates: null,
+							error: null
 						}
 					]);
 					expect(GitGraphView.currentPanel!['loadCommitsRefreshId']).toBe(2);
@@ -2872,6 +2885,7 @@ describe('GitGraphView', () => {
 				// Setup
 				const spyOnGetCommits = jest.spyOn(dataSource, 'getCommits');
 				spyOnGetCommits.mockResolvedValueOnce(getCommitsResolvedValue);
+				jest.spyOn(dataSource, 'getUncommittedChanges').mockResolvedValueOnce(0);
 
 				// Run
 				onDidReceiveMessage({
@@ -2899,6 +2913,7 @@ describe('GitGraphView', () => {
 						{
 							command: 'loadCommits',
 							refreshId: 2,
+							uncommittedPending: true,
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
@@ -2906,6 +2921,17 @@ describe('GitGraphView', () => {
 							onlyFollowFirstParent: false,
 							gerritStates: null,
 							error: getCommitsResolvedValue.error
+						},
+						{
+							command: 'loadCommits',
+							refreshId: 2,
+							commits: getCommitsResolvedValue.commits,
+							head: getCommitsResolvedValue.head,
+							tags: getCommitsResolvedValue.tags,
+							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
+							onlyFollowFirstParent: false,
+							gerritStates: null,
+							error: null
 						}
 					]);
 					expect(GitGraphView.currentPanel!['loadCommitsRefreshId']).toBe(2);
@@ -2916,6 +2942,7 @@ describe('GitGraphView', () => {
 				// Setup
 				const spyOnGetCommits = jest.spyOn(dataSource, 'getCommits');
 				spyOnGetCommits.mockResolvedValueOnce(getCommitsResolvedValue);
+				jest.spyOn(dataSource, 'getUncommittedChanges').mockResolvedValueOnce(0);
 
 				// Run
 				onDidReceiveMessage({
@@ -2943,6 +2970,7 @@ describe('GitGraphView', () => {
 						{
 							command: 'loadCommits',
 							refreshId: 2,
+							uncommittedPending: true,
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
@@ -2950,6 +2978,17 @@ describe('GitGraphView', () => {
 							onlyFollowFirstParent: false,
 							gerritStates: null,
 							error: getCommitsResolvedValue.error
+						},
+						{
+							command: 'loadCommits',
+							refreshId: 2,
+							commits: getCommitsResolvedValue.commits,
+							head: getCommitsResolvedValue.head,
+							tags: getCommitsResolvedValue.tags,
+							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
+							onlyFollowFirstParent: false,
+							gerritStates: null,
+							error: null
 						}
 					]);
 					expect(GitGraphView.currentPanel!['loadCommitsRefreshId']).toBe(2);
@@ -2960,6 +2999,7 @@ describe('GitGraphView', () => {
 				// Setup
 				const spyOnGetCommits = jest.spyOn(dataSource, 'getCommits');
 				spyOnGetCommits.mockResolvedValueOnce(getCommitsResolvedValue);
+				jest.spyOn(dataSource, 'getUncommittedChanges').mockResolvedValueOnce(0);
 
 				// Run
 				onDidReceiveMessage({
@@ -2987,6 +3027,7 @@ describe('GitGraphView', () => {
 						{
 							command: 'loadCommits',
 							refreshId: 2,
+							uncommittedPending: true,
 							commits: getCommitsResolvedValue.commits,
 							head: getCommitsResolvedValue.head,
 							tags: getCommitsResolvedValue.tags,
@@ -2994,6 +3035,17 @@ describe('GitGraphView', () => {
 							onlyFollowFirstParent: true,
 							gerritStates: null,
 							error: getCommitsResolvedValue.error
+						},
+						{
+							command: 'loadCommits',
+							refreshId: 2,
+							commits: getCommitsResolvedValue.commits,
+							head: getCommitsResolvedValue.head,
+							tags: getCommitsResolvedValue.tags,
+							moreCommitsAvailable: getCommitsResolvedValue.moreCommitsAvailable,
+							onlyFollowFirstParent: true,
+							gerritStates: null,
+							error: null
 						}
 					]);
 					expect(GitGraphView.currentPanel!['loadCommitsRefreshId']).toBe(2);

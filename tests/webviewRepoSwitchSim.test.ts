@@ -55,7 +55,7 @@ function makeState() {
 				enabled: false, remote: 'origin', fetchMode: 'latest', fetchLimit: 10, patchsets: 'latest', autoFetch: false,
 				showChangeRefs: false, includeChangeCommits: true, showReviewProgress: true,
 				showMetaCommits: 'collapsed', statusFilter: { new: true, merged: false, abandoned: false, wip: false },
-				showPushButton: true
+				showPushButton: true, showControlsBar: true
 			},
 			graph: { colours: ['#0085d9'], style: 'rounded', issueLinking: {}, grid: { x: 10, y: 24, offsetX: 8, offsetY: 8, expandY: 8 } },
 			initialLoadCommits: 500, keybindings: {}, loadMoreCommits: 100, loadMoreCommitsAutomatically: true,
@@ -149,6 +149,28 @@ describe('Webview repository switch simulation', () => {
 
 		(window as any).Element.prototype.scroll = () => undefined;
 		loadWebview();
+	});
+
+	test('the "Select for Compare" source commit is restored when the webview is reloaded', () => {
+		// 1. Load repo1 with two commits
+		respondToRepoInfo();
+		respondToCommits([REPO1_COMMIT_A, REPO1_COMMIT_B]);
+
+		// 2. Select commit A "for Compare" via its context menu
+		openCommitContextMenu(0);
+		(Array.from(document.querySelectorAll('.contextMenuItem')).find((el: any) => el.textContent === 'Select for Compare') as any).click();
+
+		// The selection must be persisted to the webview state
+		expect(webviewState.compareSourceHash).toBe(REPO1_COMMIT_A.hash);
+
+		// 3. Simulate the webview being reloaded (the panel was hidden and re-shown)
+		loadWebview();
+		respondToRepoInfo();
+		respondToCommits([REPO1_COMMIT_A, REPO1_COMMIT_B]);
+
+		// Assert: the selection must be restored, so commit B's context menu offers to compare with A
+		const menuItems = openCommitContextMenu(1);
+		expect(menuItems.some((t: any) => t.indexOf('Compare with Selected Commit') !== -1)).toBe(true);
 	});
 
 	test('the "Select for Compare" source commit and file path filter are cleared when switching repositories via the repo dropdown', () => {

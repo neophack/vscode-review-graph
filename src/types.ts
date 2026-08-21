@@ -242,6 +242,7 @@ export type GerritMetaMode = 'collapsed' | 'expanded' | 'off';
 
 export interface GerritConfig {
 	enabled: boolean;
+	showControlsBar: boolean;
 	remote: string;
 	fetchMode: GerritFetchMode;
 	fetchLimit: number;
@@ -1053,6 +1054,14 @@ export interface ResponseGerritSaveFetchConfig extends ResponseWithErrorInfo {
 	readonly command: 'gerritSaveFetchConfig';
 }
 
+export interface RequestGerritSetControlsBar extends RepoRequest {
+	readonly command: 'gerritSetControlsBar';
+	readonly enabled: boolean; // show the Gerrit controls bar (globally, on this machine)
+}
+export interface ResponseGerritSetControlsBar extends ResponseWithErrorInfo {
+	readonly command: 'gerritSetControlsBar';
+}
+
 export interface RequestFetchIntoLocalBranch extends RepoRequest {
 	readonly command: 'fetchIntoLocalBranch';
 	readonly remote: string;
@@ -1092,6 +1101,20 @@ export interface ResponseLoadCommits extends ResponseWithErrorInfo {
 	readonly onlyFollowFirstParent: boolean;
 	readonly gerritStates: GerritChangeState[] | null; // null => Gerrit integration disabled; otherwise ALL cached states (the Webview applies the status filter locally)
 	readonly gerritPending?: boolean; // true => the Gerrit data is still loading asynchronously: a final loadCommits response with the fresh Gerrit data follows
+	readonly uncommittedPending?: boolean; // true => the "Uncommitted Changes" status is still loading asynchronously: a final loadCommits response with the fresh status follows
+}
+
+export interface RequestCountCommitsBefore extends RepoRequest {
+	readonly command: 'countCommitsBefore';
+	readonly hash: string;
+	readonly branches: ReadonlyArray<string> | null; // null => Show All
+	readonly showRemoteBranches: boolean;
+	readonly includeCommitsMentionedByReflogs: boolean;
+}
+export interface ResponseCountCommitsBefore {
+	readonly command: 'countCommitsBefore';
+	readonly hash: string;
+	readonly count: number | null; // null => the hash is unknown to Git in this repository
 }
 
 export interface RequestLoadConfig extends RepoRequest {
@@ -1170,6 +1193,11 @@ export interface ResponseOpenExternalDirDiff extends ResponseWithErrorInfo {
 export interface RequestOpenExternalUrl extends BaseMessage {
 	readonly command: 'openExternalUrl';
 	readonly url: string;
+}
+export interface RequestOpenCompareTab extends RepoRequest {
+	readonly command: 'openCompareTab';
+	readonly fromHash: string;
+	readonly toHash: string;
 }
 export interface ResponseOpenExternalUrl extends ResponseWithErrorInfo {
 	readonly command: 'openExternalUrl';
@@ -1444,6 +1472,7 @@ export type RequestMessage =
 	| RequestCheckoutCommit
 	| RequestCherrypickCommit
 	| RequestCleanUntrackedFiles
+	| RequestCountCommitsBefore
 	| RequestCommitBodies
 	| RequestCommitDetails
 	| RequestCompareCommits
@@ -1475,6 +1504,7 @@ export type RequestMessage =
 	| RequestGerritInstallHook
 	| RequestGerritFetchChange
 	| RequestGerritSaveFetchConfig
+	| RequestGerritSetControlsBar
 	| RequestGerritSubmitReview
 	| RequestLoadCommits
 	| RequestLoadConfig
@@ -1484,6 +1514,7 @@ export type RequestMessage =
 	| RequestOpenExtensionSettings
 	| RequestOpenExternalDirDiff
 	| RequestOpenExternalUrl
+	| RequestOpenCompareTab
 	| RequestOpenFile
 	| RequestOpenTerminal
 	| RequestPopStash
@@ -1519,6 +1550,7 @@ export type ResponseMessage =
 	| ResponseCheckoutCommit
 	| ResponseCherrypickCommit
 	| ResponseCleanUntrackedFiles
+	| ResponseCountCommitsBefore
 	| ResponseCompareCommits
 	| ResponseCommitBodies
 	| ResponseCommitDetails
@@ -1549,6 +1581,7 @@ export type ResponseMessage =
 	| ResponseGerritInstallHook
 	| ResponseGerritFetchChange
 	| ResponseGerritSaveFetchConfig
+	| ResponseGerritSetControlsBar
 	| ResponseGerritSubmitReview
 	| ResponseLoadCommits
 	| ResponseLoadConfig

@@ -40,7 +40,7 @@ describe('Webview smoke test (media/out.min.js)', () => {
 					enabled: true, remote: 'origin', fetchMode: 'latest', fetchLimit: 10, patchsets: 'latest',
 					autoFetch: false, showChangeRefs: true, includeChangeCommits: true, showReviewProgress: true,
 					showMetaCommits: 'collapsed', statusFilter: { new: true, merged: false, abandoned: false, wip: false },
-					showPushButton: true
+					showPushButton: true, showControlsBar: true
 				},
 				graph: { colours: ['#0085d9'], style: 'rounded', issueLinking: {}, grid: { x: 10, y: 24, offsetX: 8, offsetY: 8, expandY: 8 } },
 				initialLoadCommits: 500,

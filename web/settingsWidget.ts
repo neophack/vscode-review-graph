@@ -207,6 +207,7 @@ class SettingsWidget {
 					: 'Latest ' + gerritConfig.fetchLimit + ' change' + (gerritConfig.fetchLimit === 1 ? '' : 's');
 				const gerritCacheStr = escapeHtml(gerritCacheValue + ' (Global)');
 				html += '<div class="settingsSection"><h3>Gerrit Code Review</h3><table>' +
+					'<tr class="lineAbove"><td class="left">Show Gerrit Bar:</td><td class="left"><label id="settingsShowGerritBar"><input type="checkbox" id="settingsShowGerritBarCheckbox" tabindex="-1"' + (gerritConfig.showControlsBar ? ' checked' : '') + '><span class="customCheckbox"></span>Show the Gerrit controls row (Global)</label></td><td class="btns right"></td></tr>' +
 					'<tr class="lineAbove"><td class="left">Change Refs Cache:</td><td class="leftWithEllipsis" title="' + gerritCacheStr + '">' + gerritCacheStr + '</td><td class="btns right"><div id="editGerritFetchConfig" title="Edit Change Refs Cache' + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div></td></tr>' +
 					'</table></div>';
 			}
@@ -460,6 +461,23 @@ class SettingsWidget {
 					}
 					this.view.saveRepoStateValue(this.currentRepo, 'hideRemotes', this.repo.hideRemotes);
 					this.view.refresh(true);
+				});
+			}
+
+			const showGerritBarElem = <HTMLInputElement | null>document.getElementById('settingsShowGerritBarCheckbox');
+			if (showGerritBarElem !== null) {
+				showGerritBarElem.addEventListener('change', () => {
+					if (this.currentRepo === null) return;
+					const repo = this.currentRepo;
+					const checked = (<HTMLInputElement>document.getElementById('settingsShowGerritBarCheckbox')!).checked;
+					if (checked) {
+						// Showing the bar again: saving the setting reloads the Git Graph View, which re-fetches the Gerrit change refs
+						runAction({ command: 'gerritSetControlsBar', repo: repo, enabled: true }, 'Saving Gerrit Settings');
+					} else {
+						dialog.showConfirmation('Hide the Gerrit bar for <b>all repositories on this machine</b>?<br><br>The locally cached Gerrit change refs of this repository will be deleted, and no changes will be fetched.', 'Yes, hide', () => {
+							runAction({ command: 'gerritSetControlsBar', repo: repo, enabled: false }, 'Saving Gerrit Settings');
+						}, null);
+					}
 				});
 			}
 

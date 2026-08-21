@@ -16,6 +16,12 @@ function observeWindowSizeChanges(view: GitGraphView) {
 
 			resizeRafId = null;
 
+			// The visible row count of a windowed render derives from the view height, so a resize
+			// must recompute the window (otherwise rows below the old window end are missing until
+			// the user scrolls)
+
+			view.updateVirtualWindow();
+
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 
 				view.renderGraph();
@@ -672,9 +678,9 @@ function observeTableEvents(view: GitGraphView) {
 
 						closeCommitComparison(view, true);
 
-					} else if (view.expandedCommit.commitElem !== null) {
+					} else {
 
-						loadCommitComparison(view, view.expandedCommit.commitElem, eventElem);
+						view.openCompareTab(view.expandedCommit.commitHash, commit.hash);
 
 					}
 

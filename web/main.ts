@@ -30,6 +30,11 @@ class GitGraphView {
 		requestingConfig: boolean;
 	};
 	private loadViewTo: GG.LoadGitGraphViewTo = null;
+	private pendingScrollCommitHash: string | null = null;
+	// TRUE between sending a countCommitsBefore request and its response: the response (not
+	// checkPendingScrollCommit) decides how the pending scroll commit is loaded, so the checks run
+	// on intervening loadCommits responses must not error out or start paging on their own
+	private countCommitsBeforePending: boolean = false;
 
 	public readonly graph: Graph;
 	public readonly config: Config;
@@ -64,6 +69,13 @@ class GitGraphView {
 	private static readonly VIRTUAL_ROW_BUFFER = 10;
 
 	/**
+	 * The scroll position saved before a webview reload, to be re-applied after the repository's
+	 * commits have been rendered (the view is still empty when the state is restored, so applying
+	 * it immediately would be clamped to 0). NULL => no scroll position is pending restoration.
+	 */
+	private restoreScrollTop: number | null = null;
+
+	/**
 	 * Check whether a Gerrit change state passes the status filter (applied locally by the Webview,
 	 * mirroring the extension's `filterChangeStates`, so toggling the filter chips re-renders the
 	 * badges instantly without reloading the commits).
@@ -83,7 +95,7 @@ class GitGraphView {
 	}
 
 	public gerritExpandedChanges: { [repo: string]: { [change: number]: boolean } } = {}; // session memory only (not persisted)
-	public compareSourceHash: string | null = null; // the commit selected via "Select for Compare" (session memory only, not persisted)
+	public compareSourceHash: string | null = null; // the commit selected via "Select for Compare" (persisted with the webview state)
 	private commitPathFilter: string | null = null; // the path filter applied to the loaded commits (persisted with the webview state)
 
 	private lastScrollToStash: {
@@ -204,14 +216,21 @@ class GitGraphView {
 			loadViewTo = prevState.commitPathFilter !== null && prevState.commitPathFilter !== undefined
 				? { repo: prevState.currentRepo, filterPath: prevState.commitPathFilter }
 				: { repo: prevState.currentRepo };
+			// Restore the scroll position after the repository's commits have been rendered (the view
+			// is still empty at this point, so scrolling immediately would be clamped to 0)
+			this.scrollTop = prevState.scrollTop;
+			this.restoreScrollTop = prevState.scrollTop;
 		}
 
 		if (!this.loadRepos(this.gitRepos, initialState.lastActiveRepo, loadViewTo)) {
-			if (prevState) {
-				this.scrollTop = prevState.scrollTop;
-				this.viewElem.scroll(0, this.scrollTop);
-			}
 			this.requestLoadRepoInfoAndCommits(false, false);
+		}
+		if (prevState && prevState.compareSourceHash !== null && prevState.compareSourceHash !== undefined
+			&& prevState.currentRepo === this.currentRepo) {
+			// Restore the "Select for Compare" selection after a webview reload, so it survives
+			// switching away from the panel and back (loadRepo above clears it when the repo changes)
+			this.compareSourceHash = prevState.compareSourceHash;
+			this.saveState();
 		}
 
 		const currentBtn = document.getElementById('currentBtn')!, fetchBtn = document.getElementById('fetchBtn')!, findBtn = document.getElementById('findBtn')!, settingsBtn = document.getElementById('settingsBtn')!, terminalBtn = document.getElementById('terminalBtn')!;
@@ -294,6 +313,7 @@ class GitGraphView {
 			// The repository is already loaded, but the path filter changed: reload the commits
 			this.commitPathFilter = loadViewTo !== null && typeof loadViewTo.filterPath === 'string' && loadViewTo.filterPath !== '' ? loadViewTo.filterPath : null;
 			this.renderFilterButton();
+			this.viewElem.scrollTop = 0;
 			this.refresh(false);
 			return false;
 		} else {
@@ -411,10 +431,18 @@ class GitGraphView {
 		}
 	}
 
-	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean, gerritPending: boolean = false) {
+	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean, gerritPending: boolean = false, uncommittedPending: boolean = false) {
 		// This list of tags is just used to provide additional information in the dialogs. Tag information included in commits is used for all other purposes (e.g. rendering, context menus)
 		const tagsChanged = !arraysStrictlyEqual(this.gitTags, tags);
 		this.gitTags = tags;
+
+		if (uncommittedPending && commits.length > 0 && commits[0].hash !== UNCOMMITTED &&
+			this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED && commitHead !== null) {
+			// Deferred response: the "Uncommitted Changes" status arrives in a follow-up response.
+			// Keep the row rendered (with its stale count) so it doesn't flicker away and back on
+			// every refresh - the follow-up just updates its count.
+			commits = [{ ...this.commits[0], parents: [commitHead] }, ...commits];
+		}
 
 		if (!this.currentRepoLoading && !this.currentRepoRefreshState.hard && this.moreCommitsAvailable === moreAvailable && this.onlyFollowFirstParent === onlyFollowFirstParent && this.commitHead === commitHead && commits.length > 0 && arraysEqual(this.commits, commits, (a, b) =>
 			a.hash === b.hash &&
@@ -496,8 +524,15 @@ class GitGraphView {
 		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent);
 		this.render();
 
-		if (currentRepoLoading && this.config.onRepoLoad.scrollToHead && this.commitHead !== null) {
-			this.scrollToCommit(this.commitHead, true);
+		if (currentRepoLoading) {
+			if (this.config.onRepoLoad.scrollToHead && this.commitHead !== null) {
+				this.scrollToCommit(this.commitHead, true);
+			} else if (this.restoreScrollTop !== null) {
+				// Webview reload: re-apply the scroll position saved before the reload
+				this.viewElem.scrollTop = this.restoreScrollTop;
+				this.updateVirtualWindow(); // re-render the window around the restored position
+			}
+			this.restoreScrollTop = null;
 		}
 
 		this.finaliseLoadCommits(gerritPending);
@@ -601,7 +636,48 @@ class GitGraphView {
 			this.renderRefreshButton();
 		}
 
+		this.checkPendingScrollCommit();
 		this.finaliseRepoLoad(true);
+	}
+
+	/**
+	 * Continue (or finish) an auto-load triggered by clicking a pinned commit chip that is not in
+	 * the view: scroll to it once loaded, keep paging while more commits are available, or show an
+	 * error once the whole repository history has been loaded without finding it.
+	 */
+	private checkPendingScrollCommit() {
+		if (this.pendingScrollCommitHash === null) return;
+		if (this.countCommitsBeforePending) return; // the count response drives the jump (or reports "not found")
+		const hash = this.pendingScrollCommitHash;
+		if (this.commitLookup[hash] !== undefined) {
+			this.pendingScrollCommitHash = null;
+			this.scrollToCommit(hash, true, true);
+		} else if (this.moreCommitsAvailable) {
+			this.loadMoreCommits();
+		} else {
+			this.pendingScrollCommitHash = null;
+			dialog.showError('Pinned Commit', 'The pinned commit could not be found in this repository\'s loaded history. Clear the branch / path filters and try again.', 'Close', null);
+		}
+	}
+
+	/**
+	 * Handle the response of a countCommitsBefore request (made when jumping to a pinned commit
+	 * that is not in the view): load enough commits to include it in a single request.
+	 */
+	public processCountCommitsBefore(msg: GG.ResponseCountCommitsBefore) {
+		this.countCommitsBeforePending = false;
+		if (this.pendingScrollCommitHash !== msg.hash) return;
+		if (msg.count === null) {
+			this.pendingScrollCommitHash = null;
+			dialog.showError('Pinned Commit', 'The pinned commit could not be found in this repository. It may have been rebased away, or excluded by the branch / path filters.', 'Close', null);
+			return;
+		}
+		// Jump straight to the commit: load everything up to it (plus a margin), then
+		// checkPendingScrollCommit scrolls to it once the load completes
+		this.maxCommits = Math.max(this.maxCommits, msg.count + this.config.loadMoreCommits);
+		this.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+		this.saveState();
+		this.requestLoadRepoInfoAndCommits(false, true);
 	}
 
 	private finaliseRepoLoad(didLoadRepoData: boolean) {
@@ -655,6 +731,8 @@ class GitGraphView {
 	private clearCommits() {
 		closeDialogAndContextMenu();
 		this.moreCommitsAvailable = false;
+		this.pendingScrollCommitHash = null;
+		this.countCommitsBeforePending = false;
 		this.commits = [];
 		this.commitHead = null;
 		this.commitLookup = {};
@@ -700,7 +778,7 @@ class GitGraphView {
 				}
 				this.gerritStatesDirty = !gerritStatesEqual(this.gerritStates, newStates);
 				this.gerritStates = newStates;
-				this.loadCommits(msg.commits, msg.head, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent, msg.gerritPending === true);
+				this.loadCommits(msg.commits, msg.head, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent, msg.gerritPending === true, msg.uncommittedPending === true);
 			}
 		} else {
 			const error = this.gitBranches.length === 0 && msg.error.indexOf('bad revision \'HEAD\'') > -1
@@ -844,6 +922,18 @@ class GitGraphView {
 		});
 	}
 
+	private requestCountCommitsBefore(hash: string) {
+		const repoState = this.gitRepos[this.currentRepo];
+		sendMessage({
+			command: 'countCommitsBefore',
+			repo: this.currentRepo,
+			hash: hash,
+			branches: this.currentBranches === null || (this.currentBranches.length === 1 && this.currentBranches[0] === SHOW_ALL_BRANCHES) ? null : this.currentBranches,
+			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
+			includeCommitsMentionedByReflogs: getIncludeCommitsMentionedByReflogs(repoState.includeCommitsMentionedByReflogs)
+		});
+	}
+
 	private requestLoadCommits() {
 		const repoState = this.gitRepos[this.currentRepo];
 		sendMessage({
@@ -934,6 +1024,19 @@ class GitGraphView {
 		});
 	}
 
+	/**
+	 * Open the changes between two commits in a dedicated Commit Comparison View tab
+	 * (instead of expanding the inline comparison in the commit table).
+	 */
+	public openCompareTab(hash: string, compareWithHash: string) {
+		let commitOrder = getCommitOrder(this, hash, compareWithHash);
+		sendMessage({
+			command: 'openCompareTab',
+			repo: this.currentRepo,
+			fromHash: commitOrder.from, toHash: commitOrder.to
+		});
+	}
+
 	private requestAvatars(avatars: { [email: string]: string[] }) {
 		let emails = Object.keys(avatars), remote = this.gitRemotes.length > 0 ? this.gitRemotes.includes('origin') ? 'origin' : this.gitRemotes[0] : null;
 		for (let i = 0; i < emails.length; i++) {
@@ -971,7 +1074,8 @@ class GitGraphView {
 			findWidget: this.findWidget.getState(),
 			settingsWidget: this.settingsWidget.getState(),
 			gerritStatusFilter: this.gerritStatusFilter,
-			commitPathFilter: this.commitPathFilter
+			commitPathFilter: this.commitPathFilter,
+			compareSourceHash: this.compareSourceHash
 		});
 	}
 
@@ -1094,7 +1198,15 @@ class GitGraphView {
 		if (chip === null || chip.dataset.value === undefined) return;
 		if (chip.dataset.type === 'commit') {
 			if (this.commitLookup[chip.dataset.value] === undefined) {
-				dialog.showError('Pinned Commit', 'The pinned commit is not currently in the view. Load more commits or clear the branch / path filters.', 'Close', null);
+				if (!this.moreCommitsAvailable) {
+					dialog.showError('Pinned Commit', 'The pinned commit is not currently in the view. Load more commits or clear the branch / path filters.', 'Close', null);
+					return;
+				}
+				// The pinned commit is beyond the currently loaded commits: ask the extension how
+				// many commits precede it, so the view can jump straight to it in one load
+				this.pendingScrollCommitHash = chip.dataset.value;
+				this.countCommitsBeforePending = true;
+				this.requestCountCommitsBefore(chip.dataset.value);
 				return;
 			}
 			this.scrollToCommit(chip.dataset.value, true, true);
@@ -1349,10 +1461,26 @@ class GitGraphView {
 	 */
 	public updateVirtualWindow() {
 		if (this.renderedRange === null) return;
+		if (!this.canVirtualize()) {
+			// Windowed rendering is no longer allowed (e.g. a find query became active): fall back
+			// to a full render, otherwise scrolling would keep swapping the windowed rows in and out
+			this.render();
+			return;
+		}
 		const range = this.computeVisibleRange();
 		if (range.start === this.renderedRange.start && range.end === this.renderedRange.end) return;
 		this.renderTable();
 		this.renderGraph();
+	}
+
+	/**
+	 * Switch from windowed rendering to a full render if it is currently active. Used by the Find
+	 * Widget before scanning for matches: matching only sees rows that are in the DOM, so every
+	 * commit row must be rendered (see `canVirtualize`).
+	 */
+	public exitWindowedRender() {
+		if (this.renderedRange === null) return;
+		this.render();
 	}
 
 	private renderTable() {
@@ -1365,6 +1493,16 @@ class GitGraphView {
 			(colVisibility.commit ? '<th class="tableColHeader commitCol" data-col="4">Commit</th>' : '') +
 			'</tr>';
 
+		// A full re-render can shrink the commit list (e.g. applying a path filter). A stale scroll
+		// position beyond the shrunken list is clamped BEFORE the rendered window is computed,
+		// otherwise it selects an empty window (start beyond the list) and no rows or graph vertices
+		// are rendered at all. The clamp only acts in that case: the #footer ("Load More Commits")
+		// also contributes to the scrollable height, so clamping to the table's height alone would
+		// nudge the view up on every re-render while the user is scrolled to the very bottom.
+		if (this.canVirtualize() && this.computeVisibleRange().start >= this.commits.length) {
+			const maxScroll = Math.max(0, this.getHeaderHeight() + this.commits.length * this.config.graph.rowHeight - this.viewElem.clientHeight);
+			if (this.viewElem.scrollTop > maxScroll) this.viewElem.scrollTop = maxScroll;
+		}
 		this.renderedRange = this.canVirtualize() ? this.computeVisibleRange() : null;
 		let from = 0, to = this.commits.length;
 		if (this.renderedRange !== null) {
@@ -1566,15 +1704,20 @@ class GitGraphView {
 			type: DialogInputType.Text,
 			name: 'Path',
 			default: this.commitPathFilter !== null ? this.commitPathFilter : '',
-			placeholder: 'e.g. src/main.ts or a directory or a git pathspec'
+			placeholder: 'e.g. src/main.ts, web/ (comma-separated paths; commits changing any of them are shown)'
 		}], 'Apply', (values) => {
-			const filterPath = (<string>values[0]).trim();
+			// Normalise the comma-separated paths: trim whitespace around each path and drop
+			// empty segments, so git receives clean pathspecs
+			const filterPath = (<string>values[0]).split(',').map((path) => path.trim()).filter((path) => path !== '').join(',');
 			this.commitPathFilter = filterPath !== '' ? filterPath : null;
 			this.renderFilterButton();
+			// The filtered list is unrelated to the scrolled position in the full list
+			this.viewElem.scrollTop = 0;
 			this.requestLoadRepoInfoAndCommits(true, true);
 		}, null, 'Clear Filter', () => {
 			this.commitPathFilter = null;
 			this.renderFilterButton();
+			this.viewElem.scrollTop = 0;
 			this.requestLoadRepoInfoAndCommits(true, true);
 		});
 	}
@@ -1961,6 +2104,15 @@ window.addEventListener('load', () => {
 					dialog.showError('Unable to Save Gerrit Settings', msg.error, null, null);
 				}
 				break;
+			case 'gerritSetControlsBar':
+				if (msg.error === null) {
+					// Saving the setting reloads the Git Graph View, which re-renders without the
+					// Gerrit controls bar (and, when it was hidden, without any Gerrit data)
+					dialog.closeActionRunning();
+				} else {
+					dialog.showError('Unable to Save Gerrit Settings', msg.error, null, null);
+				}
+				break;
 			case 'gerritClearRefs':
 				if (msg.error === null) {
 					dialog.showMessage('Deleted <b>' + msg.cleared + '</b> Gerrit change ref' + (msg.cleared === 1 ? '' : 's') + ' from <b>refs/remotes/' + escapeHtml(initialState.config.gerrit.remote) + '/changes/*</b>.');
@@ -2002,6 +2154,9 @@ window.addEventListener('load', () => {
 				break;
 			case 'commitBodies':
 				gitGraph.processCommitBodies(msg);
+				break;
+			case 'countCommitsBefore':
+				gitGraph.processCountCommitsBefore(msg);
 				break;
 			case 'loadCommits':
 				gitGraph.processLoadCommitsResponse(msg);

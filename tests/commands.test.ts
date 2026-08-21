@@ -240,7 +240,7 @@ describe('CommandManager', () => {
 	describe('review-graph.filterByFile', () => {
 		it('Should open the Git Graph View filtered to the file', async () => {
 			// Setup
-			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValueOnce('/path/to/workspace-folder/repo');
+			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValue('/path/to/workspace-folder/repo');
 
 			// Run
 			vscode.commands.executeCommand('review-graph.filterByFile', vscode.Uri.file('/path/to/workspace-folder/repo/src/main.ts'));
@@ -252,10 +252,47 @@ describe('CommandManager', () => {
 			});
 		});
 
+		it('Should open the Git Graph View filtered to multiple selected files (comma-separated, duplicates removed)', async () => {
+			// Setup
+			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValue('/path/to/workspace-folder/repo');
+
+			// Run
+			vscode.commands.executeCommand('review-graph.filterByFile', [
+				vscode.Uri.file('/path/to/workspace-folder/repo/src/main.ts'),
+				vscode.Uri.file('/path/to/workspace-folder/repo/web/main.ts'),
+				vscode.Uri.file('/path/to/workspace-folder/repo/src/main.ts')
+			]);
+
+			// Assert
+			await waitForExpect(() => {
+				expect(spyOnGitGraphViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/workspace-folder/repo', filterPath: 'src/main.ts,web/main.ts' });
+			});
+		});
+
+		it('Should display an error message when the selected files are in different repositories', async () => {
+			// Setup
+			const spyOnShowErrorMessage = jest.spyOn(utils, 'showErrorMessage');
+			jest.spyOn(repoManager, 'getRepoContainingFile')
+				.mockReturnValueOnce('/path/to/workspace-folder/repo')
+				.mockReturnValueOnce('/path/to/other/repo');
+
+			// Run
+			vscode.commands.executeCommand('review-graph.filterByFile', [
+				vscode.Uri.file('/path/to/workspace-folder/repo/src/main.ts'),
+				vscode.Uri.file('/path/to/other/repo/src/main.ts')
+			]);
+
+			// Assert
+			await waitForExpect(() => {
+				expect(spyOnShowErrorMessage).toHaveBeenCalled();
+				expect(spyOnGitGraphViewCreateOrShow).not.toHaveBeenCalled();
+			});
+		});
+
 		it('Should display an error message when the file is not within a known repository', async () => {
 			// Setup
 			const spyOnShowErrorMessage = jest.spyOn(utils, 'showErrorMessage');
-			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValueOnce(null);
+			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValue(null);
 
 			// Run
 			vscode.commands.executeCommand('review-graph.filterByFile', vscode.Uri.file('/unknown/location/file.ts'));

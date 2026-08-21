@@ -138,11 +138,11 @@ function lastLoadCommitsRequestId() {
 	return loadMsg.refreshId;
 }
 
-function respondLoadCommits(refreshId: number, commits: any[], gerritPending: boolean = false) {
+function respondLoadCommits(refreshId: number, commits: any[], gerritPending: boolean = false, uncommittedPending: boolean = false) {
 	window.dispatchEvent(new MessageEvent('message', { data: {
 		command: 'loadCommits', refreshId: refreshId, error: null, head: HEAD_HASH, tags: [],
 		moreCommitsAvailable: false, onlyFollowFirstParent: false, gerritPending: gerritPending,
-		gerritStates: null, commits: commits
+		uncommittedPending: uncommittedPending, gerritStates: null, commits: commits
 	} }));
 }
 
@@ -181,6 +181,43 @@ describe('Webview deferred uncommitted-changes follow-up simulation', () => {
 		respondLoadCommits(refreshId + 1, [UNCOMMITTED_ROW, ...COMMITS]);
 
 		expect(document.querySelectorAll('tr.commit').length).toBe(3);
+		expect(document.getElementById('uncommittedChanges')).toBeNull();
+	});
+
+	test('a deferred refresh keeps the rendered uncommitted row; the follow-up only updates its count', () => {
+		respondToRepoInfo();
+		const refreshId = lastLoadCommitsRequestId();
+
+		// Initial load: deferred initial response, then the follow-up prepends the row (3 files)
+		respondLoadCommits(refreshId, COMMITS, false, true);
+		respondLoadCommits(refreshId, [UNCOMMITTED_ROW, ...COMMITS]);
+		expect(document.getElementById('uncommittedChanges')).not.toBeNull();
+		expect(document.getElementById('uncommittedChanges').textContent).toContain('Uncommitted Changes (3)');
+
+		// Auto-refresh (e.g. the repo file watcher): the deferred initial response (marked
+		// uncommittedPending) must NOT remove the rendered row - it stays with its stale count
+		// until the follow-up updates it
+		window.dispatchEvent(new MessageEvent('message', { data: { command: 'refresh' } }));
+		respondToRepoInfo();
+		const newRefreshId = lastLoadCommitsRequestId();
+		expect(newRefreshId).toBeGreaterThan(refreshId);
+		respondLoadCommits(newRefreshId, COMMITS, false, true);
+		const row = document.getElementById('uncommittedChanges');
+		expect(row).not.toBeNull();
+		expect(row.textContent).toContain('Uncommitted Changes (3)');
+
+		// Follow-up with a new count: only the number in the row is updated
+		respondLoadCommits(newRefreshId, [{ ...UNCOMMITTED_ROW, message: 'Uncommitted Changes (5)' }, ...COMMITS]);
+		const updatedRow = document.getElementById('uncommittedChanges');
+		expect(updatedRow).not.toBeNull();
+		expect(updatedRow.textContent).toContain('Uncommitted Changes (5)');
+
+		// Next auto-refresh with a clean working tree (count 0): the follow-up drops the row
+		window.dispatchEvent(new MessageEvent('message', { data: { command: 'refresh' } }));
+		respondToRepoInfo();
+		const cleanRefreshId = lastLoadCommitsRequestId();
+		respondLoadCommits(cleanRefreshId, COMMITS, false, true);
+		respondLoadCommits(cleanRefreshId, COMMITS);
 		expect(document.getElementById('uncommittedChanges')).toBeNull();
 	});
 

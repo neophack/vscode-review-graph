@@ -228,44 +228,59 @@ export class CommandManager extends Disposable {
 
 	/**
 	 * The method run when the `review-graph.filterByFile` command is invoked.
-	 * Opens the Git Graph view filtered to only show commits that modified the specified file.
-	 * @param arg The argument passed to the command (a file URI, or an object containing a file URI).
+	 * Opens the Git Graph view filtered to only show commits that modified any of the specified
+	 * files (multiple selected files are combined into a comma-separated filter).
+	 * @param arg The argument passed to the command (file URIs, or objects containing file URIs).
 	 */
 	private async filterByFile(arg: any) {
-		const uri = this.getUriFromCommandArg(arg);
-		if (uri === null) {
+		const uris = this.getUrisFromCommandArg(arg);
+		if (uris.length === 0) {
 			showErrorMessage('Unable to determine the file to filter the Git Graph view by.');
 			return;
 		}
 
-		const filePath = getPathFromUri(uri);
-		const repo = this.repoManager.getRepoContainingFile(filePath);
+		const repo = this.repoManager.getRepoContainingFile(getPathFromUri(uris[0]));
 		if (repo === null) {
-			showErrorMessage('The file "' + filePath + '" is not within a repository known to Git Graph.');
+			showErrorMessage('The file "' + getPathFromUri(uris[0]) + '" is not within a repository known to Git Graph.');
 			return;
 		}
 
-		// Compute the path of the file relative to the repository root (using forward slashes, as expected by git)
-		let filterPath = getPathFromStr(path.relative(repo, filePath));
-		if (filterPath === '') filterPath = '.';
+		// Compute the paths of the files relative to the repository root (using forward slashes, as
+		// expected by git), joined into a comma-separated filter (paths containing commas are not
+		// supported by this filter syntax)
+		const filterPaths: string[] = [];
+		for (const uri of uris) {
+			const filePath = getPathFromUri(uri);
+			if (this.repoManager.getRepoContainingFile(filePath) !== repo) {
+				showErrorMessage('All selected files must be within the same repository.');
+				return;
+			}
+			let filterPath = getPathFromStr(path.relative(repo, filePath));
+			if (filterPath === '') filterPath = '.';
+			if (!filterPaths.includes(filterPath)) filterPaths.push(filterPath);
+		}
 
-		GitGraphView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, { repo: repo, filterPath: filterPath });
+		GitGraphView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, { repo: repo, filterPath: filterPaths.join(',') });
 	}
 
 	/**
-	 * Extract a file URI from a command argument (a URI, or an object/array containing a URI).
+	 * Extract file URIs from a command argument (URIs, or objects containing URIs). When multiple
+	 * items are selected in the explorer, VS Code passes an array of them.
 	 * @param arg The argument passed to the command.
-	 * @returns The file URI, or NULL if it could not be determined.
+	 * @returns The file URIs (empty if none could be determined).
 	 */
-	private getUriFromCommandArg(arg: any): vscode.Uri | null {
-		if (Array.isArray(arg) && arg.length > 0) arg = arg[0];
-		if (arg && arg.resourceUri) return arg.resourceUri; // e.g. a SourceControlResourceState
-		if (arg && arg.uri && arg.uri.scheme) return arg.uri;
-		if (arg && arg.scheme && arg.fsPath) return arg; // a URI
-		if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === 'file') {
-			return vscode.window.activeTextEditor.document.uri;
+	private getUrisFromCommandArg(arg: any): vscode.Uri[] {
+		const args = Array.isArray(arg) ? arg : [arg];
+		const uris: vscode.Uri[] = [];
+		for (const a of args) {
+			if (a && a.resourceUri) uris.push(a.resourceUri); // e.g. a SourceControlResourceState
+			else if (a && a.uri && a.uri.scheme) uris.push(a.uri);
+			else if (a && a.scheme && a.fsPath) uris.push(a); // a URI
 		}
-		return null;
+		if (uris.length === 0 && vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === 'file') {
+			uris.push(vscode.window.activeTextEditor.document.uri);
+		}
+		return uris;
 	}
 
 	/**

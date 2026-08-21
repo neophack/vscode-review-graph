@@ -192,6 +192,28 @@ describe('Webview virtualization & lazy bodies simulation', () => {
 		expect(bodiesRequests).toBe(1);
 	});
 
+	test('a shrunken commit list (e.g. an applied path filter) re-renders at a valid window', async () => {
+		loadWebview(false);
+		const viewport = mockViewport(480);
+		respondToRepoInfo();
+		respondToLoadCommits(Array.from({ length: 300 }, (_v, i) => makeCommit(i)));
+
+		// Scroll deep into the full list, then apply a path filter: the response replaces the
+		// list with a much shorter one while the scroll position is still deep in the old list
+		viewport.scrollTo(250 * ROW_HEIGHT);
+		await flush();
+		expect(commitRows().length).toBeGreaterThan(0);
+
+		respondToLoadCommits(Array.from({ length: 120 }, (_v, i) => makeCommit(i)));
+
+		// The stale scroll position must not select an empty window: rows are rendered again,
+		// and they are the tail of the new (shorter) list, not beyond its end
+		const ids = commitRows().map((row: any) => parseInt(row.dataset.id, 10));
+		expect(ids.length).toBeGreaterThan(20);
+		for (let i = 1; i < ids.length; i++) expect(ids[i]).toBe(ids[i - 1] + 1);
+		expect(ids[ids.length - 1]).toBe(119);
+	});
+
 	test('the persisted webview state no longer contains the commit list or avatars', () => {
 		loadWebview(false);
 		respondToRepoInfo();

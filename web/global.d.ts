@@ -65,6 +65,7 @@ declare global {
 		readonly settingsWidget: SettingsWidgetState;
 		readonly gerritStatusFilter?: GG.GerritStatusFilter | null;
 		readonly commitPathFilter?: string | null; // only show commits that modified the file(s) at this path
+		readonly compareSourceHash?: string | null; // the commit selected via "Select for Compare"
 	}
 
 

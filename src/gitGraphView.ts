@@ -10,6 +10,7 @@ const MEDIA_CACHE_VERSION = '1.39.0';
 
 import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
+import { CommitComparisonView } from './comparisonView';
 import { DataSource, GitCommitData, GitCommitDetailsData, GitConfigKey } from './dataSource';
 import { ExtensionState } from './extensionState';
 import { buildFetchRefspecs, changeShard, extractChangeId, filterChangeStates, generateChangeId, hasChangeId, limitChanges, normalizeGerritFetchLimit, parseChangeRef, parseLsRemoteChanges } from './gerrit';
@@ -188,6 +189,10 @@ export class GitGraphView extends Disposable {
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (e.affectsConfiguration('review-graph')) {
 					const config = getConfig();
+					// Cached commit data also depends on settings that aren't part of the cache key
+					// (e.g. showCommitsOnlyReferencedByTags, showRemoteHeads): the webview re-requests
+					// with an identical key, so drop the cache to avoid serving stale commits
+					this.commitCache.clear();
 					this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
 						? this.getResourcesUri('gerrit-webview-icon.svg')
 						: {
@@ -485,13 +490,20 @@ export class GitGraphView extends Disposable {
 					error: await this.dataSource.fetchIntoLocalBranch(msg.repo, msg.remote, msg.remoteBranch, msg.localBranch, msg.force)
 				});
 				break;
+			case 'countCommitsBefore':
+				this.sendMessage({
+					command: 'countCommitsBefore',
+					hash: msg.hash,
+					count: await this.dataSource.countCommitsBefore(msg.repo, msg.branches, msg.hash, msg.showRemoteBranches, msg.includeCommitsMentionedByReflogs)
+				});
+				break;
 			case 'loadCommits': {
 				this.loadCommitsRefreshId = msg.refreshId;
 				const config = getConfig().gerrit;
 				const gerritShowChangeRefs = config.showChangeRefs;
 				// A forced refresh (the Refresh button) must observe fresh repository state: bypass the commit cache
 				const forceFresh = msg.gerritForceRefresh === true;
-				if (!config.enabled || config.fetchMode === 'off') {
+				if (!this.isGerritEnabled() || config.fetchMode === 'off') {
 					// Gerrit integration disabled: load the commits without any Gerrit data
 					const commitData = await this.getCommitsCached(msg, null, gerritShowChangeRefs, true, forceFresh);
 					this.sendMessage({
@@ -499,6 +511,7 @@ export class GitGraphView extends Disposable {
 						refreshId: msg.refreshId,
 						onlyFollowFirstParent: msg.onlyFollowFirstParent,
 						gerritStates: null,
+						uncommittedPending: true,
 						...commitData
 					});
 					this.sendUncommittedChangesFollowUp(msg, commitData, null); // runs asynchronously (never awaited)
@@ -511,6 +524,7 @@ export class GitGraphView extends Disposable {
 						refreshId: msg.refreshId,
 						onlyFollowFirstParent: msg.onlyFollowFirstParent,
 						gerritStates: gerritData !== null ? gerritData.states : null,
+						uncommittedPending: true,
 						...commitData
 					});
 					this.sendUncommittedChangesFollowUp(msg, commitData, gerritData !== null ? gerritData.states : null); // runs asynchronously (never awaited)
@@ -532,6 +546,7 @@ export class GitGraphView extends Disposable {
 							refreshId: msg.refreshId,
 							onlyFollowFirstParent: msg.onlyFollowFirstParent,
 							gerritStates: gerritData !== null ? gerritData.states : null,
+							uncommittedPending: true,
 							...commitData
 						});
 						this.sendUncommittedChangesFollowUp(msg, commitData, gerritData !== null ? gerritData.states : null); // runs asynchronously (never awaited)
@@ -574,6 +589,12 @@ export class GitGraphView extends Disposable {
 				this.sendMessage({
 					command: 'gerritSaveFetchConfig',
 					error: await this.gerritSaveFetchConfig(msg.fetchMode, msg.fetchLimit)
+				});
+				break;
+			case 'gerritSetControlsBar':
+				this.sendMessage({
+					command: 'gerritSetControlsBar',
+					error: await this.gerritSetControlsBar(msg.repo, msg.enabled)
 				});
 				break;
 			case 'gerritClearRefs':
@@ -659,6 +680,9 @@ export class GitGraphView extends Disposable {
 					command: 'openExternalDirDiff',
 					error: await this.dataSource.openExternalDirDiff(msg.repo, msg.fromHash, msg.toHash, msg.isGui)
 				});
+				break;
+			case 'openCompareTab':
+				CommitComparisonView.open(this.dataSource, msg.repo, msg.fromHash, msg.toHash);
 				break;
 			case 'openExternalUrl':
 				this.sendMessage({
@@ -997,6 +1021,16 @@ export class GitGraphView extends Disposable {
 	/* Gerrit Methods */
 
 	/**
+	 * Whether Gerrit integration is active: the global `gerrit.enabled` setting must be on, and the
+	 * Gerrit controls bar must not be hidden (the "Show Gerrit Bar" toggle of the Repository Settings,
+	 * which applies globally to every repository on this machine).
+	 */
+	private isGerritEnabled(): boolean {
+		const config = getConfig().gerrit;
+		return config.enabled && config.showControlsBar;
+	}
+
+	/**
 	 * Load the Gerrit change states of a repository with the status filter applied.
 	 * The unfiltered Gerrit data of each repository is cached, so that switching the status filter
 	 * (or re-loading the Git Graph View) is displayed instantly. The cache is only refreshed when
@@ -1008,7 +1042,7 @@ export class GitGraphView extends Disposable {
 	 */
 	private async loadGerritData(repo: string, statusFilter: GerritStatusFilter | null, forceRefresh: boolean): Promise<{ states: GerritChangeState[], refs: string[] } | null> {
 		const config = getConfig().gerrit;
-		if (!config.enabled || config.fetchMode === 'off') return null;
+		if (!this.isGerritEnabled() || config.fetchMode === 'off') return null;
 
 		let cache = this.gerritCache.get(repo) || null;
 		if (cache === null) {
@@ -1123,24 +1157,28 @@ export class GitGraphView extends Disposable {
 	/**
 	 * Complete a `loadCommits` request that was already answered without waiting for the
 	 * uncommitted changes status (a `git status` that can be slow on large working trees, so it's
-	 * deliberately excluded from the initial response). Fetches the status and, if there are
-	 * uncommitted changes, sends a follow-up `loadCommits` response with the synthetic
-	 * "Uncommitted Changes" row prepended to the SAME commit list already sent, so no Git commands
-	 * (log/refs) are re-run.
+	 * deliberately excluded from the initial response). Fetches the status and sends the final
+	 * `loadCommits` response marked `uncommittedPending: false`, prepending the synthetic
+	 * "Uncommitted Changes" row to the SAME commit list already sent when there are uncommitted
+	 * changes, so no Git commands (log/refs) are re-run. The Git Graph View keeps the previously
+	 * rendered row (with its stale count) until this response arrives, so the row never flickers
+	 * away and back on a refresh - only its count is updated.
 	 * @param msg The original `loadCommits` request message.
 	 * @param commitData The commit data already sent in the initial response.
 	 * @param gerritStates The Gerrit states already sent in the initial response (unaffected by this follow-up).
 	 */
 	private async sendUncommittedChangesFollowUp(msg: RequestLoadCommits, commitData: GitCommitData, gerritStates: GerritChangeState[] | null) {
+		// Match dataSource.getCommits: only prepend the row when HEAD is among the loaded commits
+		// (with a filter or cutoff excluding HEAD, the row would have no parent in the graph).
 		if (!getConfig().showUncommittedChanges || commitData.head === null || commitData.error !== null) return;
+		if (!commitData.commits.some((commit) => commit.hash === commitData.head)) return;
 
-		let numUncommittedChanges: number;
+		let numUncommittedChanges = 0;
 		try {
 			numUncommittedChanges = await this.dataSource.getUncommittedChanges(msg.repo);
 		} catch (_) {
-			return;
+			numUncommittedChanges = 0;
 		}
-		if (typeof numUncommittedChanges !== 'number' || numUncommittedChanges <= 0) return;
 		if (this.loadCommitsRefreshId !== msg.refreshId) return; // superseded by a newer load request
 
 		this.sendMessage({
@@ -1148,18 +1186,20 @@ export class GitGraphView extends Disposable {
 			refreshId: msg.refreshId,
 			onlyFollowFirstParent: msg.onlyFollowFirstParent,
 			gerritStates: gerritStates,
-			commits: [{
-				hash: UNCOMMITTED,
-				parents: [commitData.head],
-				author: '*',
-				email: '',
-				date: Math.round(Date.now() / 1000),
-				message: 'Uncommitted Changes (' + numUncommittedChanges + ')',
-				heads: [],
-				tags: [],
-				remotes: [],
-				stash: null
-			}, ...commitData.commits],
+			commits: numUncommittedChanges > 0
+				? [{
+					hash: UNCOMMITTED,
+					parents: [commitData.head],
+					author: '*',
+					email: '',
+					date: Math.round(Date.now() / 1000),
+					message: 'Uncommitted Changes (' + numUncommittedChanges + ')',
+					heads: [],
+					tags: [],
+					remotes: [],
+					stash: null
+				}, ...commitData.commits]
+				: commitData.commits,
 			head: commitData.head,
 			tags: commitData.tags,
 			moreCommitsAvailable: commitData.moreCommitsAvailable,
@@ -1362,6 +1402,36 @@ export class GitGraphView extends Disposable {
 		// settings): the onDidChangeConfiguration listener reloads the Git Graph View, causing the
 		// next load to fetch exactly the configured number of changes (pruning any surplus local refs)
 		for (const repo of this.gerritCache.keys()) this.gerritStaleRepos.add(repo);
+		this.gerritCache.clear();
+		this.gerritFetches.clear();
+		this.gerritCacheGeneration++;
+		return null;
+	}
+
+	/**
+	 * Show or hide the Gerrit controls bar (saved to the Global User Settings, so it applies to every
+	 * repository on this machine). Hiding it also deletes the repository's locally cached Gerrit
+	 * change refs and invalidates all cached Gerrit data, so nothing is fetched or displayed.
+	 * @param repo The path of the repository the setting was toggled in.
+	 * @param enabled Whether the Gerrit controls bar should be shown.
+	 * @returns The ErrorInfo of the failure (NULL => saved successfully).
+	 */
+	private async gerritSetControlsBar(repo: string, enabled: boolean): Promise<ErrorInfo> {
+		try {
+			await vscode.workspace.getConfiguration('review-graph').update('gerrit.showControlsBar', enabled, vscode.ConfigurationTarget.Global);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.log('Saving the Gerrit controls bar setting failed: ' + message);
+			return message;
+		}
+
+		if (!enabled) {
+			// The Gerrit bar was hidden: delete the locally cached change refs of the repository, so
+			// they are not served (offline) either, and drop all cached Gerrit data of every repository
+			const result = await this.dataSource.gerrit.clearLocalChanges(repo, getConfig().gerrit.remote);
+			if (result.error !== null) this.logger.log('Clearing the Gerrit change refs failed: ' + result.error);
+		}
+		this.gerritStaleRepos.clear();
 		this.gerritCache.clear();
 		this.gerritFetches.clear();
 		this.gerritCacheGeneration++;

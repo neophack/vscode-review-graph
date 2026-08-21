@@ -1,7 +1,7 @@
 {
 	"name": "review-graph",
 	"displayName": "Review Graph",
-	"version": "1.38.4",
+	"version": "1.38.5",
 	"publisher": "aucneon",
 	"engine": {
 		"node": "18.17.1"
@@ -1237,6 +1237,11 @@
 					"default": true,
 					"description": "Enable Gerrit Code Review integration (change refs, review progress badges, submitting commits for review)."
 				},
+				"review-graph.gerrit.showControlsBar": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show the Gerrit controls bar (the header row with Gerrit actions). When disabled, all locally cached Gerrit change refs are cleared and no changes are fetched."
+				},
 				"review-graph.gerrit.remote": {
 					"type": "string",
 					"default": "origin",
@@ -1650,7 +1655,7 @@
 			"explorer/context": [
 				{
 					"command": "review-graph.filterByFile",
-					"when": "resourceScheme == file",
+					"when": "resourceScheme == file && !listMultiSelection",
 					"group": "review-graph@1"
 				}
 			],
@@ -1664,6 +1669,7 @@
 			"scm/resourceState/context": [
 				{
 					"command": "review-graph.filterByFile",
+					"when": "!listMultiSelection",
 					"group": "review-graph@1"
 				}
 			],

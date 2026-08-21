@@ -44,19 +44,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 					if (refCommitIndex > -1 && compareCommitIndex > -1) {
 
-						const commitElem = findCommitElemWithId(refCommitIndex);
-
-						const compareElem = findCommitElemWithId(compareCommitIndex);
-
-						if (commitElem && compareElem) {
-
-							loadCommitComparison(view, commitElem, compareElem);
-
-						} else {
-
-							dialog.showError('Compare Branch', 'Could not find the commits for the selected branches in the current view. Try loading more commits.', 'Close', null);
-
-						}
+						view.openCompareTab(view.commits[refCommitIndex].hash, view.commits[compareCommitIndex].hash);
 
 					} else {
 
@@ -667,6 +655,8 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 				view.compareSourceHash = hash;
 
+				view.saveState();
+
 			}
 
 		}, {
@@ -681,19 +671,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 				if (compareSourceHash === null) return;
 
-				const commitElem = findCommitElemWithId(view.getCommitId(hash));
-
-				const compareElem = findCommitElemWithId(view.getCommitId(compareSourceHash));
-
-				if (commitElem !== null && compareElem !== null) {
-
-					loadCommitComparison(view, commitElem, compareElem);
-
-				} else {
-
-					dialog.showError('Compare Commits', 'Could not find both commits in the current view. Try loading more commits.', 'Close', null);
-
-				}
+				view.openCompareTab(hash, compareSourceHash);
 
 			}
 
