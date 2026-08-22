@@ -433,7 +433,7 @@ export class ExtensionState extends Disposable {
 	 * Set the Code Reviews in the current workspace.
 	 * @param reviews The set of Code Reviews.
 	 */
-	private setCodeReviews(reviews: CodeReviews) {
+	public setCodeReviews(reviews: CodeReviews) {
 		return this.updateWorkspaceState(CODE_REVIEWS, reviews);
 	}
 

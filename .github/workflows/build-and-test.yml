@@ -12,12 +12,24 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-node@v1
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
       with:
-        node-version: '12.x'
+        node-version: '18.x'
     - run: npm install
     - run: npm run compile
-    - run: npm run test
+    - run: npm test -- --runInBand
+    - name: Package extension
+      if: matrix.os == 'ubuntu-latest'
+      run: npx vsce package
+    - name: Upload extension package
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: gerrit-graph-vsix
+        path: '*.vsix'

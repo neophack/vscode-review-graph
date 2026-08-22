@@ -95,6 +95,8 @@ class GitGraphView {
 	}
 
 	public gerritExpandedChanges: { [repo: string]: { [change: number]: boolean } } = {}; // session memory only (not persisted)
+	/** The branch the current pull request status was requested for (NULL => none requested). */
+	private prStatusBranch: string | null = null;
 	public compareSourceHash: string | null = null; // the commit selected via "Select for Compare" (persisted with the webview state)
 	private commitPathFilter: string | null = null; // the path filter applied to the loaded commits (persisted with the webview state)
 
@@ -121,6 +123,8 @@ class GitGraphView {
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
 		this.gitRepos = initialState.repos;
 		this.config = initialState.config;
+		setInterfaceLanguage(this.config.interfaceLanguage);
+		this.renderToolbarText();
 		this.maxCommits = this.config.initialLoadCommits;
 		this.viewElem = viewElem;
 		this.currentRepoRefreshState = {
@@ -148,18 +152,18 @@ class GitGraphView {
 
 		this.graph = new Graph('commitGraph', viewElem, this.config.graph, this.config.mute);
 
-		this.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values) => {
+		this.repoDropdown = new Dropdown('repoDropdown', true, false, strings.dropdownRepos, (values) => {
 			this.loadRepo(values[0]);
 		});
 
-		this.branchDropdown = new Dropdown('branchDropdown', false, true, 'Branches', (values) => {
+		this.branchDropdown = new Dropdown('branchDropdown', false, true, strings.dropdownBranches, (values) => {
 			this.currentBranches = values;
 			this.maxCommits = this.config.initialLoadCommits;
 			this.saveState();
 			this.clearCommits();
 			this.requestLoadRepoInfoAndCommits(true, true);
 		});
-		this.authorDropdown = new Dropdown('authorDropdown', false, true, 'Authors', (values) => {
+		this.authorDropdown = new Dropdown('authorDropdown', false, true, strings.dropdownAuthors, (values) => {
 			this.currentAuthors = values;
 			this.maxCommits = this.config.initialLoadCommits;
 			this.saveState();
@@ -234,19 +238,23 @@ class GitGraphView {
 		}
 
 		const currentBtn = document.getElementById('currentBtn')!, fetchBtn = document.getElementById('fetchBtn')!, findBtn = document.getElementById('findBtn')!, settingsBtn = document.getElementById('settingsBtn')!, terminalBtn = document.getElementById('terminalBtn')!;
+		currentBtn.title = strings.scrollToHeadTitle;
 		currentBtn.innerHTML = SVG_ICONS.current;
 		currentBtn.addEventListener('click', () => {
 			if (this.commitHead) {
 				this.scrollToCommit(this.commitHead, true, true);
 			}
 		});
-		fetchBtn.title = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
+		fetchBtn.title = this.config.fetchAndPrune ? strings.fetchAndPruneTitle : strings.fetchTitle;
 		fetchBtn.innerHTML = SVG_ICONS.download;
 		fetchBtn.addEventListener('click', () => fetchFromRemotesAction(this));
+		findBtn.title = strings.findTitle;
 		findBtn.innerHTML = SVG_ICONS.search;
 		findBtn.addEventListener('click', () => this.findWidget.show(true));
+		settingsBtn.title = strings.settingsTitle;
 		settingsBtn.innerHTML = SVG_ICONS.gear;
 		settingsBtn.addEventListener('click', () => this.settingsWidget.show(this.currentRepo));
+		terminalBtn.title = strings.terminalTitle;
 		terminalBtn.innerHTML = SVG_ICONS.terminal;
 		terminalBtn.addEventListener('click', () => {
 			runAction({
@@ -288,7 +296,7 @@ class GitGraphView {
 				this.loadViewTo = loadViewTo;
 			} else {
 				this.loadViewTo = null;
-				showErrorMessage('Unable to load the Git Graph View for the repository "' + loadViewTo.repo + '". It is not currently included in Git Graph.');
+				showErrorMessage(formatStr(strings.unableToLoadRepo, loadViewTo.repo));
 			}
 		} else {
 			this.loadViewTo = null;
@@ -335,6 +343,8 @@ class GitGraphView {
 		this.currentAuthors = null;
 		this.commitPathFilter = null;
 		this.compareSourceHash = null;
+		this.prStatusBranch = null;
+		this.renderPullRequestStatus(null);
 		this.renderFetchButton();
 		this.renderFilterButton();
 		closeCommitDetails(this, false);
@@ -675,7 +685,7 @@ class GitGraphView {
 		// Jump straight to the commit: load everything up to it (plus a margin), then
 		// checkPendingScrollCommit scrolls to it once the load completes
 		this.maxCommits = Math.max(this.maxCommits, msg.count + this.config.loadMoreCommits);
-		this.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+		this.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + strings.loading + '</h2>';
 		this.saveState();
 		this.requestLoadRepoInfoAndCommits(false, true);
 	}
@@ -695,7 +705,7 @@ class GitGraphView {
 					this.loadMoreCommits();
 					return; // Wait for next load
 				} else {
-					showErrorMessage('Commit not found in this repository.');
+					showErrorMessage(strings.commitNotFound);
 					this.loadViewTo = null;
 				}
 			} else if (this.loadViewTo.commitDetails && (this.expandedCommit === null || this.expandedCommit.commitHash !== this.loadViewTo.commitDetails.commitHash || this.expandedCommit.compareWithHash !== this.loadViewTo.commitDetails.compareWithHash)) {
@@ -711,7 +721,7 @@ class GitGraphView {
 						loadCommitDetails(this, commitElem);
 					}
 				} else {
-					showErrorMessage('Unable to resume Code Review, it could not be found in the latest ' + this.maxCommits + ' commits that were loaded in this repository.');
+					showErrorMessage(formatStr(strings.unableToResumeCodeReview, String(this.maxCommits)));
 				}
 			} else if (this.loadViewTo.runCommandOnLoad) {
 				switch (this.loadViewTo.runCommandOnLoad) {
@@ -752,8 +762,57 @@ class GitGraphView {
 	public processLoadRepoInfoResponse(msg: GG.ResponseLoadRepoInfo) {
 		if (msg.error === null) {
 			this.loadRepoInfo(msg.branches, msg.head, msg.remotes, msg.stashes, msg.isRepo);
+			this.requestPullRequestStatus();
 		} else {
 			this.displayLoadDataError('Unable to load Repository Info', msg.error);
+		}
+	}
+
+	/**
+	 * Request the pull/merge request status of the checked-out branch from the extension host
+	 * (only when the pull request integration is enabled). One request per branch: the request
+	 * is skipped when the status of this branch was already requested.
+	 */
+	private requestPullRequestStatus() {
+		const branch = this.gitBranchHead;
+		if (!this.config.pullRequests.enabled || branch === null) {
+			this.prStatusBranch = null;
+			this.renderPullRequestStatus(null);
+			return;
+		}
+		if (this.prStatusBranch === branch) return;
+		this.prStatusBranch = branch;
+		sendMessage({ command: 'fetchPullRequest', repo: this.currentRepo, branch: branch });
+	}
+
+	/**
+	 * Process a pull request status response (ignored when the checked-out branch changed since).
+	 */
+	public processPullRequestStatus(msg: GG.ResponsePullRequestStatus) {
+		if (this.gitBranchHead !== msg.branch || this.prStatusBranch !== msg.branch) return;
+		this.renderPullRequestStatus(msg.pr);
+	}
+
+	/**
+	 * Render the pull request status badge in the header (hidden when there is no matching PR/MR).
+	 */
+	private renderPullRequestStatus(pr: GG.PullRequestInfo | null) {
+		const elem = document.getElementById('prStatus');
+		if (elem === null) return;
+		if (pr === null) {
+			elem.style.display = 'none';
+			elem.innerHTML = '';
+			return;
+		}
+		const stateText = pr.state === 'merged' ? strings.prStateMerged : pr.state === 'closed' ? strings.prStateClosed : pr.state === 'draft' ? strings.prStateDraft : strings.prStateOpen;
+		const author = pr.author !== '' ? ' · ' + escapeHtml(pr.author) : '';
+		elem.innerHTML = '<a class="prBadge st-' + pr.state + '" tabindex="-1" title="' + escapeHtml(formatStr(strings.prStatusTitle, '#' + pr.number, pr.title)) + '">' + strings.prLabel + ' #' + pr.number + ' · ' + stateText + author + '</a>';
+		elem.style.display = 'block';
+		const badge = elem.querySelector('.prBadge');
+		if (badge !== null) {
+			badge.addEventListener('click', () => {
+				if (pr.url !== '') runAction({ command: 'openExternalUrl', url: pr.url }, strings.prOpening);
+			});
 		}
 	}
 
@@ -980,7 +1039,7 @@ class GitGraphView {
 
 		this.renderRefreshButton();
 		if (this.commits.length === 0) {
-			this.tableElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+			this.tableElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + strings.loading + '</h2>';
 		}
 
 		if (skipRepoInfo) {
@@ -1170,17 +1229,17 @@ class GitGraphView {
 		const pinnedBranches = this.getPinnedBranches();
 		const pinnedCommits = this.getPinnedCommits();
 
-		let html = '<span class="unselectable pinnedRowLabel">Pinned:</span>';
+		let html = '<span class="unselectable pinnedRowLabel">' + strings.pinnedLabel + '</span>';
 		for (const branch of pinnedBranches) {
 			const name = escapeHtml(branch);
-			html += '<span class="pinnedChip" data-type="branch" data-value="' + name + '" title="Show only branch ' + name + ' (click ✕ to unpin)">\uD83D\uDCCC ' + name +
-				'<span class="pinnedChipRemove" data-type="branch" data-value="' + name + '" title="Unpin branch ' + name + '">&times;</span></span>';
+			html += '<span class="pinnedChip" data-type="branch" data-value="' + name + '"' + formatStr(strings.pinnedBranchChipTitle, name) + '">\uD83D\uDCCC ' + name +
+				'<span class="pinnedChipRemove" data-type="branch" data-value="' + name + '" title="' + formatStr(strings.pinnedUnpinBranch, name) + '">&times;</span></span>';
 		}
 		for (const pinned of pinnedCommits) {
 			const hash = escapeHtml(pinned.hash);
 			const summary = escapeHtml(pinned.summary.length > 30 ? pinned.summary.substring(0, 30) + '…' : pinned.summary);
-			html += '<span class="pinnedChip" data-type="commit" data-value="' + hash + '" title="Jump to commit ' + hash + ' (click ✕ to unpin)">\uD83D\uDCCC <b>' + abbrevCommit(pinned.hash) + '</b>' + (summary !== '' ? ' ' + summary : '') +
-				'<span class="pinnedChipRemove" data-type="commit" data-value="' + hash + '" title="Unpin commit ' + hash + '">&times;</span></span>';
+			html += '<span class="pinnedChip" data-type="commit" data-value="' + hash + '"' + formatStr(strings.pinnedCommitChipTitle, hash) + '">\uD83D\uDCCC <b>' + abbrevCommit(pinned.hash) + '</b>' + (summary !== '' ? ' ' + summary : '') +
+				'<span class="pinnedChipRemove" data-type="commit" data-value="' + hash + '" title="' + formatStr(strings.pinnedUnpinCommit, hash) + '">&times;</span></span>';
 		}
 		controls.innerHTML = html;
 		controls.style.display = pinnedBranches.length + pinnedCommits.length > 0 ? 'block' : 'none';
@@ -1518,7 +1577,7 @@ class GitGraphView {
 			html += this.getSpacerRowHtml(this.commits.length - to);
 		}
 		this.tableElem.innerHTML = '<table>' + html + '</table>';
-		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">Load More Commits</div>' : '';
+		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">' + strings.loadMoreCommits + '</div>' : '';
 		makeTableResizable(this);
 		this.findWidget.refresh();
 		this.renderedGitBranchHead = this.gitBranchHead;
@@ -1691,8 +1750,8 @@ class GitGraphView {
 		if (filterBtn === null) return;
 		filterBtn.innerHTML = SVG_ICONS.filter;
 		filterBtn.title = this.commitPathFilter !== null
-			? 'Filter Commits by Path (active: ' + this.commitPathFilter + ')'
-			: 'Filter Commits by Path';
+			? formatStr(strings.filterTitleActive, this.commitPathFilter)
+			: strings.filterTitle;
 		alterClass(filterBtn, 'active', this.commitPathFilter !== null);
 	}
 
@@ -1700,12 +1759,12 @@ class GitGraphView {
 	 * Show the dialog used to filter the loaded commits by a file path.
 	 */
 	private showPathFilterDialog() {
-		dialog.showForm('Filter the commits by a file path:', [{
+		dialog.showForm(strings.filterByPathMessage, [{
 			type: DialogInputType.Text,
-			name: 'Path',
+			name: strings.filterPathName,
 			default: this.commitPathFilter !== null ? this.commitPathFilter : '',
-			placeholder: 'e.g. src/main.ts, web/ (comma-separated paths; commits changing any of them are shown)'
-		}], 'Apply', (values) => {
+			placeholder: strings.filterPathPlaceholder
+		}], strings.dialogApply, (values) => {
 			// Normalise the comma-separated paths: trim whitespace around each path and drop
 			// empty segments, so git receives clean pathspecs
 			const filterPath = (<string>values[0]).split(',').map((path) => path.trim()).filter((path) => path !== '').join(',');
@@ -1714,7 +1773,7 @@ class GitGraphView {
 			// The filtered list is unrelated to the scrolled position in the full list
 			this.viewElem.scrollTop = 0;
 			this.requestLoadRepoInfoAndCommits(true, true);
-		}, null, 'Clear Filter', () => {
+		}, null, strings.dialogClearFilter, () => {
 			this.commitPathFilter = null;
 			this.renderFilterButton();
 			this.viewElem.scrollTop = 0;
@@ -1722,9 +1781,30 @@ class GitGraphView {
 		});
 	}
 
+	public renderToolbarText() {
+		const setText = (id: string, text: string) => {
+			const elem = document.getElementById(id);
+			if (elem !== null) elem.textContent = text;
+		};
+		setText('repoControlLabel', strings.repoLabel);
+		setText('branchControlLabel', strings.branchesLabel);
+		setText('authorControlLabel', strings.authorsLabel);
+		setText('showRemoteBranchesLabel', strings.showRemoteBranchesLabel);
+		const showRemoteBranchesControl = document.getElementById('showRemoteBranchesControl');
+		if (showRemoteBranchesControl !== null) showRemoteBranchesControl.title = strings.showRemoteBranchesTitle;
+		const filterBtn = document.getElementById('filterBtn');
+		if (filterBtn !== null) {
+			filterBtn.title = this.commitPathFilter !== null
+				? formatStr(strings.filterTitleActive, this.commitPathFilter)
+				: strings.filterTitle;
+		}
+		setText('gerritRowLabel', strings.gerritLabel);
+		setText('pinnedRowLabel', strings.pinnedLabel);
+	}
+
 	public renderRefreshButton() {
 		const enabled = !this.currentRepoRefreshState.inProgress;
-		this.refreshBtnElem.title = enabled ? 'Refresh' : 'Refreshing';
+		this.refreshBtnElem.title = enabled ? strings.refreshTitle : strings.refreshingTitle;
 		this.refreshBtnElem.innerHTML = enabled ? SVG_ICONS.refresh : SVG_ICONS.loading;
 		alterClass(this.refreshBtnElem, CLASS_REFRESHING, !enabled);
 	}
@@ -1873,7 +1953,7 @@ class GitGraphView {
 	}
 
 	public loadMoreCommits() {
-		this.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+		this.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + strings.loading + '</h2>';
 		this.maxCommits += this.config.loadMoreCommits;
 		this.saveState();
 		this.requestLoadRepoInfoAndCommits(false, true);
@@ -2169,6 +2249,12 @@ window.addEventListener('load', () => {
 				break;
 			case 'loadRepos':
 				gitGraph.loadRepos(msg.repos, msg.lastActiveRepo, msg.loadViewTo);
+				break;
+			case 'pullRequestStatus':
+				gitGraph.processPullRequestStatus(msg);
+				break;
+			case 'setInterfaceLanguage':
+				finishOrDisplayError(msg.error, strings.settingsUnableToSaveLanguage);
 				break;
 			case 'merge':
 				refreshOrDisplayError(msg.error, 'Unable to Merge ' + msg.actionOn);

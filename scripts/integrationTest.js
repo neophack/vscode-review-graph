@@ -2,7 +2,7 @@
  * Integration test: run the compiled extension (out/*) against a real repository
  * with a Gerrit remote, exercising the full Gerrit pipeline + commit loading.
  *
- * Usage: node tests/tmp/integrationTest.js <repoPath> [remote]
+ * Usage: node scripts/integrationTest.js <repoPath> [remote]
  * NOTE: never submits/pushes anything; only runs the same git commands the view runs on refresh.
  */
 const path = require('path');
@@ -17,8 +17,8 @@ const repo = process.argv[2];
 const remote = process.argv[3] || 'origin';
 if (!repo) { console.error('Usage: node integrationTest.js <repoPath> [remote]'); process.exit(1); }
 
-const DataSource = require('../../out/dataSource.js').DataSource;
-const gerritMod = require('../../out/gerrit.js');
+const DataSource = require('../out/dataSource.js').DataSource;
+const gerritMod = require('../out/gerrit.js');
 
 let pass = 0, fail = 0;
 function check(name, cond, detail) {
@@ -27,7 +27,7 @@ function check(name, cond, detail) {
 }
 
 async function main() {
-	const utils = require('../../out/utils.js');
+	const utils = require('../out/utils.js');
 	const gitExecutable = await utils.getGitExecutable('git');
 	const ds = new DataSource(gitExecutable, () => ({ dispose: () => undefined }), () => undefined, { log: () => undefined, logCmd: () => undefined });
 	const gs = new gerritMod.GerritDataSource(ds);

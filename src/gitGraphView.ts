@@ -15,6 +15,7 @@ import { DataSource, GitCommitData, GitCommitDetailsData, GitConfigKey } from '.
 import { ExtensionState } from './extensionState';
 import { buildFetchRefspecs, changeShard, extractChangeId, filterChangeStates, generateChangeId, hasChangeId, limitChanges, normalizeGerritFetchLimit, parseChangeRef, parseLsRemoteChanges } from './gerrit';
 import { Logger } from './logger';
+import { PullRequestDataSource } from './pullRequests';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
 import { ErrorInfo, GerritChangeState, GerritStatusFilter, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestLoadCommits, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
@@ -57,6 +58,8 @@ export class GitGraphView extends Disposable {
 	private gerritFetches: Map<string, Promise<GerritCacheEntry | null>> = new Map();
 	private gerritCacheGeneration: number = 0; // incremented whenever the Gerrit fetch settings change, so stale in-flight fetches don't repopulate the cache
 	private gerritStaleRepos: Set<string> = new Set(); // repos whose cached Gerrit data must be re-fetched from the remote on the next load
+
+	private readonly pullRequests: PullRequestDataSource = new PullRequestDataSource();
 
 	/**
 	 * Cache of recently loaded commit data, keyed by the full request signature. getCommits
@@ -128,10 +131,10 @@ export class GitGraphView extends Disposable {
 			retainContextWhenHidden: config.retainContextWhenHidden
 		});
 		this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
-			? this.getResourcesUri('gerrit-webview-icon.svg')
+			? this.getResourcesUri('review-graph-webview-icon.svg')
 			: {
-				light: this.getResourcesUri('gerrit-webview-icon-light.svg'),
-				dark: this.getResourcesUri('gerrit-webview-icon-dark.svg')
+				light: this.getResourcesUri('review-graph-webview-icon-light.svg'),
+				dark: this.getResourcesUri('review-graph-webview-icon-dark.svg')
 			};
 
 
@@ -194,10 +197,10 @@ export class GitGraphView extends Disposable {
 					// with an identical key, so drop the cache to avoid serving stale commits
 					this.commitCache.clear();
 					this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
-						? this.getResourcesUri('gerrit-webview-icon.svg')
+						? this.getResourcesUri('review-graph-webview-icon.svg')
 						: {
-							light: this.getResourcesUri('gerrit-webview-icon-light.svg'),
-							dark: this.getResourcesUri('gerrit-webview-icon-dark.svg')
+							light: this.getResourcesUri('review-graph-webview-icon-light.svg'),
+							dark: this.getResourcesUri('review-graph-webview-icon-dark.svg')
 						};
 					this.update();
 				}
@@ -572,6 +575,21 @@ export class GitGraphView extends Disposable {
 				}
 				break;
 			}
+			case 'fetchPullRequest': {
+				this.sendMessage({
+					command: 'pullRequestStatus',
+					branch: msg.branch,
+					pr: await this.fetchPullRequest(msg.repo, msg.branch)
+				});
+				break;
+			}
+			case 'setInterfaceLanguage': {
+				this.sendMessage({
+					command: 'setInterfaceLanguage',
+					error: await this.setInterfaceLanguage(msg.language)
+				});
+				break;
+			}
 			case 'gerritSubmitReview':
 				this.sendMessage({
 					command: 'gerritSubmitReview',
@@ -913,6 +931,7 @@ export class GitGraphView extends Disposable {
 				fetchAvatars: config.fetchAvatars && this.extensionState.isAvatarStorageAvailable(),
 				gerrit: config.gerrit,
 				graph: config.graph,
+				interfaceLanguage: config.interfaceLanguage,
 				includeCommitsMentionedByReflogs: config.includeCommitsMentionedByReflogs,
 				initialLoadCommits: config.initialLoadCommits,
 				keybindings: config.keybindings,
@@ -924,6 +943,7 @@ export class GitGraphView extends Disposable {
 
 				onlyFollowFirstParent: config.onlyFollowFirstParent,
 				onRepoLoad: config.onRepoLoad,
+				pullRequests: config.pullRequests,
 				referenceLabels: config.referenceLabels,
 				repoDropdownOrder: config.repoDropdownOrder,
 				showCommitBodyInline: config.showCommitBodyInline,
@@ -957,29 +977,30 @@ export class GitGraphView extends Disposable {
 			<div id="view" tabindex="-1">
 				<div id="headerRow"${stickyClassAttr}>
 					<div id="controls">
-						<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
-						<span id="branchControl"><span class="unselectable">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
-						<span id="authorControl"><span class="unselectable">Authors: </span><div id="authorDropdown" class="dropdown"></div></span>
+						<span id="repoControl"><span id="repoControlLabel" class="unselectable"></span><div id="repoDropdown" class="dropdown"></div></span>
+						<span id="branchControl"><span id="branchControlLabel" class="unselectable"></span><div id="branchDropdown" class="dropdown"></div></span>
+						<span id="authorControl"><span id="authorControlLabel" class="unselectable"></span><div id="authorDropdown" class="dropdown"></div></span>
 
-					<label id="showRemoteBranchesControl" title="Show Remote Branches: display remote branches in the graph"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Remote</label>
-					<div id="currentBtn" title="Current"></div>
-						<div id="findBtn" title="Find"></div>
-						<div id="filterBtn" title="Filter Commits by Path"></div>
-						<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
-						<div id="settingsBtn" title="Repository Settings"></div>
+					<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span><span id="showRemoteBranchesLabel"></span></label>
+					<div id="currentBtn"></div>
+						<div id="findBtn"></div>
+						<div id="filterBtn"></div>
+						<div id="terminalBtn"></div>
+						<div id="settingsBtn"></div>
 						<div id="fetchBtn"></div>
 						<div id="refreshBtn"></div>
 					</div>
 					<div id="gerritControls">
-						<span class="unselectable gerritRowLabel">Gerrit:</span>
+						<span id="gerritRowLabel" class="unselectable gerritRowLabel"></span>
 						<span id="gerritFilterControl"></span>
-						<div id="gerritAmendBtn" title="Amend a Gerrit Change-Id onto HEAD (only when HEAD has none yet and hasn't been pushed)"></div>
-						<div id="gerritSubmitBtn" title="Submit HEAD for Gerrit Review"></div>
-						<div id="gerritClearRefsBtn" title="Delete all locally downloaded Gerrit change refs (refs/remotes/&lt;remote&gt;/changes/*)"></div>
-						<div id="gerritHooksBtn" title="Show the status of this repository's Git hooks (and install the Gerrit commit-msg hook)"></div>
+						<div id="gerritAmendBtn"></div>
+						<div id="gerritSubmitBtn"></div>
+						<div id="gerritClearRefsBtn"></div>
+						<div id="gerritHooksBtn"></div>
 					</div>
+					<div id="prStatus" style="display:none"></div>
 					<div id="pinnedControls" style="display:none">
-						<span class="unselectable pinnedRowLabel">Pinned:</span>
+						<span id="pinnedRowLabel" class="unselectable pinnedRowLabel"></span>
 					</div>
 				</div>
 				<div id="content">
@@ -1017,6 +1038,45 @@ export class GitGraphView extends Disposable {
 		</html>`;
 	}
 
+
+	/* Pull Request Methods */
+
+	/**
+	 * Get the pull/merge request whose source branch matches the checked-out branch of a repository.
+	 * Degrades to NULL whenever the integration is disabled, the remote isn't hosted on GitHub or
+	 * GitLab, or the API request fails (any failure is silent).
+	 * @param repo The path of the repository.
+	 * @param branch The branch name.
+	 */
+	private async fetchPullRequest(repo: string, branch: string) {
+		if (!getConfig().pullRequests.enabled) return null;
+		try {
+			const remoteUrl = await this.dataSource.gitOutput(['remote', 'get-url', 'origin'], repo, (stdout) => stdout.trim());
+			return await this.pullRequests.getPullRequestForBranch(remoteUrl, branch);
+		} catch (_) {
+			return null;
+		}
+	}
+
+
+	/**
+	 * Save the `review-graph.interfaceLanguage` setting to the Global User Settings. The
+	 * onDidChangeConfiguration listener reloads the Git Graph View, which re-renders the webview
+	 * with the new language (the settings page is restored from the persisted webview state).
+	 * @param language The interface language.
+	 * @returns The ErrorInfo of the failure (NULL => saved successfully).
+	 */
+	private async setInterfaceLanguage(language: 'en' | 'zh-cn'): Promise<ErrorInfo> {
+		if (language !== 'en' && language !== 'zh-cn') return 'The interface language must be either "en" or "zh-cn".';
+		try {
+			await vscode.workspace.getConfiguration('review-graph').update('interfaceLanguage', language, vscode.ConfigurationTarget.Global);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.log('Saving the interface language failed: ' + message);
+			return message;
+		}
+		return null;
+	}
 
 	/* Gerrit Methods */
 

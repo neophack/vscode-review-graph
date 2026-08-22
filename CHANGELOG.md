@@ -30,7 +30,7 @@
 * **Filter commits by path**: a new filter button (next to Find) limits the loaded commits to those that modified a file or directory (git pathspec syntax supported), addressing the most requested upstream feature.
 * **Compare commits**: "Select for Compare" / "Compare with Selected Commit" in the commit context menu open the diff between any two commits.
 * **Diff with Working Tree**: the commit context menu can open an external directory diff between a commit and the current working tree.
-* Branding: all user-facing messages now consistently say "Gerrit Graph".
+* Branding: all user-facing messages now consistently say "Review Graph".
 
 ### Tests
 * Restored the 40 skipped `DataSource` tests (repository info, commit loading and config), updated to the current command pipeline (NUL-separated log records, full-body subjects, Gerrit change-ref exclusions, tags).
@@ -54,10 +54,10 @@
 * Replace the Gerrit meta event chip's box-drawing text (`├─┼─ +2/+1`) with a single compact chevron toggle button: no more tab-drawing characters or review score numbers next to the change badge (scores remain visible on the CR/V labels and in the expanded event rows).
 
 ## [1.37.28] - 2026-08-19
-* Rename the extension's entire Visual Studio Code namespace from `git-graph` to `review-graph` (command IDs, configuration setting keys, diff view URI scheme, webview type, context keys, and the per-repository config file, now `.vscode/review-graph.json`), so Gerrit Graph and the original Git Graph extension can be installed and used side by side without conflicts. Both extensions' SCM title-bar buttons now appear together, each with its own icon.
+* Rename the extension's entire Visual Studio Code namespace from `git-graph` to `review-graph` (command IDs, configuration setting keys, diff view URI scheme, webview type, context keys, and the per-repository config file, now `.vscode/review-graph.json`), so Review Graph and the original Git Graph extension can be installed and used side by side without conflicts. Both extensions' SCM title-bar buttons now appear together, each with its own icon.
 * Note: settings previously configured for this extension under `git-graph.*` must be re-applied under `review-graph.*`, and per-repository config files must be renamed from `.vscode/vscode-git-graph.json` to `.vscode/review-graph.json`.
-* Fix the "View Gerrit Graph" SCM button and Diff Views breaking when the original Git Graph extension is installed at the same time (caused by duplicate `git-graph.*` command IDs and URI scheme).
-* Repair the GitGraphView test suite (dead since the Gerrit integration commit) and align all tests with the Gerrit Graph behaviour and naming.
+* Fix the "View Review Graph" SCM button and Diff Views breaking when the original Git Graph extension is installed at the same time (caused by duplicate `git-graph.*` command IDs and URI scheme).
+* Repair the GitGraphView test suite (dead since the Gerrit integration commit) and align all tests with the Review Graph behaviour and naming.
 
 ## [1.37.27] - 2026-08-19
 * Always show the review actor in Gerrit meta event rows: the reviewer column no longer collapses to zero width when space is tight (it truncates with an ellipsis at a 4em floor instead), and the date column floor is right-sized (8.5em) to save space.

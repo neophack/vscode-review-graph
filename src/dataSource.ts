@@ -112,9 +112,9 @@ export class DataSource extends Disposable {
 		this.registerDisposables(
 			onDidChangeConfiguration((event) => {
 				if (
-					event.affectsConfiguration('review-graph.date.type') || event.affectsConfiguration('review-graph.dateType') ||
-					event.affectsConfiguration('review-graph.repository.commits.showSignatureStatus') || event.affectsConfiguration('review-graph.showSignatureStatus') ||
-					event.affectsConfiguration('review-graph.repository.useMailmap') || event.affectsConfiguration('review-graph.useMailmap')
+					event.affectsConfiguration('review-graph.date.type') ||
+					event.affectsConfiguration('review-graph.repository.commits.showSignatureStatus') ||
+					event.affectsConfiguration('review-graph.repository.useMailmap')
 				) {
 					this.generateGitCommandFormats();
 				}

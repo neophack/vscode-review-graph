@@ -1617,3 +1617,36 @@ body.vscode-high-contrast .gg-event-detail {
 	}
 }
 
+
+/* Pull Request status badge row: shown under the controls when pullRequests.enabled and the
+   checked-out branch has a matching pull/merge request on the remote (GitHub/GitLab). */
+#prStatus{
+	display:none;
+	padding:2px 6px;
+	line-height:22px;
+	font-size:12px;
+	text-align:left;
+	border-bottom:1px solid rgba(128,128,128,0.35);
+	-webkit-user-select:none;
+	user-select:none;
+	white-space:nowrap;
+	overflow-x:auto;
+}
+
+.prBadge{
+	display:inline-block;
+	padding:0 8px;
+	margin:2px 0;
+	border:1px solid var(--vscode-panel-border, #444);
+	border-radius:10px;
+	cursor:pointer;
+	text-decoration:none;
+	color:var(--vscode-foreground);
+	white-space:nowrap;
+}
+
+.prBadge:hover{ opacity:0.85; }
+.prBadge.st-open{ color:var(--vscode-charts-green, #2da44e); }
+.prBadge.st-merged{ color:#a371f7; }
+.prBadge.st-closed{ color:var(--gg-rejected, #bb4b4b); }
+.prBadge.st-draft{ color:var(--vscode-descriptionForeground, #888); }

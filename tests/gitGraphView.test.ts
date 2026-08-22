@@ -230,7 +230,7 @@ describe('GitGraphView', () => {
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-			expect(mockedWebviewPanel.panel.iconPath).toStrictEqual(vscode.Uri.file(path.join('/path/to/extension', 'resources', 'gerrit-webview-icon.svg')));
+			expect(mockedWebviewPanel.panel.iconPath).toStrictEqual(vscode.Uri.file(path.join('/path/to/extension', 'resources', 'review-graph-webview-icon.svg')));
 		});
 
 		it('Should construct a WebviewPanel with a grey icon', () => {
@@ -243,8 +243,8 @@ describe('GitGraphView', () => {
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			expect(mockedWebviewPanel.panel.iconPath).toStrictEqual({
-				light: vscode.Uri.file(path.join('/path/to/extension', 'resources', 'gerrit-webview-icon-light.svg')),
-				dark: vscode.Uri.file(path.join('/path/to/extension', 'resources', 'gerrit-webview-icon-dark.svg'))
+				light: vscode.Uri.file(path.join('/path/to/extension', 'resources', 'review-graph-webview-icon-light.svg')),
+				dark: vscode.Uri.file(path.join('/path/to/extension', 'resources', 'review-graph-webview-icon-dark.svg'))
 			});
 		});
 

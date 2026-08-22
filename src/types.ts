@@ -256,6 +256,22 @@ export interface GerritConfig {
 	showPushButton: boolean;
 }
 
+export type PullRequestState = 'open' | 'merged' | 'closed' | 'draft';
+
+/** A pull request (GitHub) or merge request (GitLab) of the repository's remote. */
+export interface PullRequestInfo {
+	number: number;
+	title: string;
+	state: PullRequestState;
+	author: string;
+	url: string;
+	sourceBranch: string;
+}
+
+export interface PullRequestsConfig {
+	enabled: boolean;
+}
+
 export interface PinnedCommit {
 	hash: string;
 	summary: string;
@@ -313,6 +329,7 @@ export interface GitGraphViewConfig {
 	readonly fetchAvatars: boolean;
 	readonly graph: GraphConfig;
 	readonly gerrit: GerritConfig;
+	readonly interfaceLanguage: 'en' | 'zh-cn';
 	readonly includeCommitsMentionedByReflogs: boolean;
 	readonly initialLoadCommits: number;
 	readonly keybindings: KeybindingConfig
@@ -324,6 +341,7 @@ export interface GitGraphViewConfig {
 
 	readonly onlyFollowFirstParent: boolean;
 	readonly onRepoLoad: OnRepoLoadConfig;
+	readonly pullRequests: PullRequestsConfig;
 	readonly referenceLabels: ReferenceLabelsConfig;
 	readonly repoDropdownOrder: RepoDropdownOrder;
 	readonly showCommitBodyInline: boolean;
@@ -1463,6 +1481,24 @@ export interface ResponseViewScm extends ResponseWithErrorInfo {
 	readonly command: 'viewScm';
 }
 
+export interface RequestFetchPullRequest extends RepoRequest {
+	readonly command: 'fetchPullRequest';
+	readonly branch: string;
+}
+export interface ResponsePullRequestStatus {
+	readonly command: 'pullRequestStatus';
+	readonly branch: string;
+	readonly pr: PullRequestInfo | null;
+}
+
+export interface RequestSetInterfaceLanguage extends BaseMessage {
+	readonly command: 'setInterfaceLanguage';
+	readonly language: 'en' | 'zh-cn';
+}
+export interface ResponseSetInterfaceLanguage extends ResponseWithErrorInfo {
+	readonly command: 'setInterfaceLanguage';
+}
+
 export type RequestMessage =
 	RequestAddRemote
 	| RequestAddTag
@@ -1539,7 +1575,9 @@ export type RequestMessage =
 	| RequestViewDiff
 	| RequestViewDiffWithWorkingFile
 	| RequestViewFileAtRevision
-	| RequestViewScm;
+	| RequestViewScm
+	| RequestFetchPullRequest
+	| RequestSetInterfaceLanguage;
 
 export type ResponseMessage =
 	ResponseAddRemote
@@ -1613,7 +1651,9 @@ export type ResponseMessage =
 	| ResponseViewDiff
 	| ResponseViewDiffWithWorkingFile
 	| ResponseViewFileAtRevision
-	| ResponseViewScm;
+	| ResponseViewScm
+	| ResponsePullRequestStatus
+	| ResponseSetInterfaceLanguage;
 
 
 /** Helper Types */

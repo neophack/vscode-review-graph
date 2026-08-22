@@ -37,6 +37,8 @@ export class CommitComparisonView extends Disposable {
 			enableScripts: true
 		});
 
+		CommitComparisonView.openViews.set(key, this);
+
 		this.registerDisposables(
 			this.panel.onDidDispose(() => {
 				CommitComparisonView.openViews.delete(key);
@@ -149,9 +151,10 @@ export class CommitComparisonView extends Disposable {
 	#fileHeader button { flex-shrink: 0; }
 	#diffArea { flex: 1; overflow: auto; }
 	.status { padding: 16px; opacity: 0.8; }
-	table.diff { border-collapse: collapse; width: 100%; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; line-height: 19px; }
-	table.diff td { padding: 0 8px; vertical-align: top; white-space: pre; }
-	td.ln { width: 1%; min-width: 38px; text-align: right; color: var(--vscode-editorLineNumber-foreground, rgba(128,128,128,0.7)); user-select: none; border-right: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.25)); background: rgba(128,128,128,0.06); }
+		table.diff { border-collapse: collapse; width: 100%; table-layout: fixed; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; line-height: 19px; }
+		table.diff td { padding: 0 8px; vertical-align: top; }
+		table.diff td.code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; }
+		td.ln { width: 46px; text-align: right; color: var(--vscode-editorLineNumber-foreground, rgba(128,128,128,0.7)); user-select: none; border-right: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.25)); background: rgba(128,128,128,0.06); }
 	tr.ctx td.code { background: var(--vscode-editor-background); }
 	tr.add td.code, tr.add td.ln { background: rgba(46,160,67,0.15); }
 	tr.add td.code { color: var(--vscode-gitDecoration-addedResourceForeground, #22863a); }
@@ -279,8 +282,9 @@ const changes = ${encodeJsonForInlineScript(JSON.stringify(this.fileChanges))};
 
 	// Parse a unified diff into split-view rows (old side / new side), GitHub style
 	function renderDiff(diffText) {
-		const table = document.createElement('table');
-		table.className = 'diff';
+			const table = document.createElement('table');
+			table.className = 'diff';
+			table.innerHTML = '<colgroup><col style="width: 46px"><col style="width: calc(50% - 46px)"><col style="width: 46px"><col style="width: calc(50% - 46px)"></colgroup>';
 		let oldLine = 0, newLine = 0, rows = document.createDocumentFragment();
 		function row(trClass, o, n, oldContent, newContent) {
 			const tr = document.createElement('tr');

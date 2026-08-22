@@ -4,7 +4,7 @@ jest.mock('vscode', () => vscode, { virtual: true });
 import { getConfig } from '../src/config';
 import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, DateType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
 
-import { expectRenamedExtensionSettingToHaveBeenCalled } from './helpers/expectations';
+import { expectExtensionSettingToHaveBeenCalled } from './helpers/expectations';
 
 const workspaceConfiguration = vscode.mocks.workspaceConfiguration;
 
@@ -48,7 +48,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.autoCenter;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter');
 				expect(value).toBe(true);
 			});
 
@@ -60,7 +60,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.autoCenter;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter');
 				expect(value).toBe(false);
 			});
 
@@ -72,7 +72,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.autoCenter;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter');
 				expect(value).toBe(true);
 			});
 
@@ -84,7 +84,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.autoCenter;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter');
 				expect(value).toBe(false);
 			});
 
@@ -93,7 +93,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.autoCenter;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.autoCenter');
 				expect(value).toBe(true);
 			});
 		});
@@ -107,7 +107,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileTreeCompactFolders;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders');
 				expect(value).toBe(true);
 			});
 
@@ -119,7 +119,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileTreeCompactFolders;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders');
 				expect(value).toBe(false);
 			});
 
@@ -131,7 +131,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileTreeCompactFolders;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders');
 				expect(value).toBe(true);
 			});
 
@@ -143,7 +143,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileTreeCompactFolders;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders');
 				expect(value).toBe(false);
 			});
 
@@ -152,7 +152,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileTreeCompactFolders;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.fileTree.compactFolders');
 				expect(value).toBe(true);
 			});
 		});
@@ -166,7 +166,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileViewType;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type');
 				expect(value).toBe(FileViewType.Tree);
 			});
 
@@ -178,7 +178,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileViewType;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type');
 				expect(value).toBe(FileViewType.List);
 			});
 
@@ -190,7 +190,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileViewType;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type');
 				expect(value).toBe(FileViewType.Tree);
 			});
 
@@ -199,7 +199,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.fileViewType;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type');
 				expect(value).toBe(FileViewType.Tree);
 			});
 		});
@@ -213,7 +213,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.location;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.location', 'commitDetailsViewLocation');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.location');
 				expect(value).toBe(CommitDetailsViewLocation.Inline);
 			});
 
@@ -225,7 +225,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.location;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.location', 'commitDetailsViewLocation');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.location');
 				expect(value).toBe(CommitDetailsViewLocation.DockedToBottom);
 			});
 
@@ -237,7 +237,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.location;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.location', 'commitDetailsViewLocation');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.location');
 				expect(value).toBe(CommitDetailsViewLocation.Inline);
 			});
 
@@ -246,7 +246,7 @@ describe('Config', () => {
 				const value = config.commitDetailsView.location;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.location', 'commitDetailsViewLocation');
+				expectExtensionSettingToHaveBeenCalled('commitDetailsView.location');
 				expect(value).toBe(CommitDetailsViewLocation.Inline);
 			});
 		});
@@ -686,7 +686,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateAndTime, iso: false });
 		});
 
@@ -698,7 +698,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateOnly, iso: false });
 		});
 
@@ -710,7 +710,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateAndTime, iso: true });
 		});
 
@@ -722,7 +722,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateOnly, iso: true });
 		});
 
@@ -734,7 +734,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.Relative, iso: false });
 		});
 
@@ -746,7 +746,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateAndTime, iso: false });
 		});
 
@@ -755,7 +755,7 @@ describe('Config', () => {
 			const value = config.dateFormat;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.format', 'dateFormat');
+			expectExtensionSettingToHaveBeenCalled('date.format');
 			expect(value).toStrictEqual({ type: DateFormatType.DateAndTime, iso: false });
 		});
 	});
@@ -769,7 +769,7 @@ describe('Config', () => {
 			const value = config.dateType;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
+			expectExtensionSettingToHaveBeenCalled('date.type');
 			expect(value).toBe(DateType.Author);
 		});
 
@@ -781,7 +781,7 @@ describe('Config', () => {
 			const value = config.dateType;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
+			expectExtensionSettingToHaveBeenCalled('date.type');
 			expect(value).toBe(DateType.Commit);
 		});
 
@@ -793,7 +793,7 @@ describe('Config', () => {
 			const value = config.dateType;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
+			expectExtensionSettingToHaveBeenCalled('date.type');
 			expect(value).toBe(DateType.Author);
 		});
 
@@ -802,7 +802,7 @@ describe('Config', () => {
 			const value = config.dateType;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
+			expectExtensionSettingToHaveBeenCalled('date.type');
 			expect(value).toBe(DateType.Author);
 		});
 	});
@@ -1742,7 +1742,7 @@ describe('Config', () => {
 				const value = config.graph.colours;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
+				expectExtensionSettingToHaveBeenCalled('graph.colours');
 				expect(value).toHaveLength(3);
 				expect(value[0]).toBe('#ff0000');
 				expect(value[1]).toBe('#00ff0088');
@@ -1757,7 +1757,7 @@ describe('Config', () => {
 				const value = config.graph.colours;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
+				expectExtensionSettingToHaveBeenCalled('graph.colours');
 				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
 			});
 
@@ -1769,7 +1769,7 @@ describe('Config', () => {
 				const value = config.graph.colours;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
+				expectExtensionSettingToHaveBeenCalled('graph.colours');
 				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
 			});
 
@@ -1778,7 +1778,7 @@ describe('Config', () => {
 				const value = config.graph.colours;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
+				expectExtensionSettingToHaveBeenCalled('graph.colours');
 				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
 			});
 		});
@@ -1792,7 +1792,7 @@ describe('Config', () => {
 				const value = config.graph.style;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.style', 'graphStyle');
+				expectExtensionSettingToHaveBeenCalled('graph.style');
 				expect(value).toBe(GraphStyle.Rounded);
 			});
 
@@ -1804,7 +1804,7 @@ describe('Config', () => {
 				const value = config.graph.style;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.style', 'graphStyle');
+				expectExtensionSettingToHaveBeenCalled('graph.style');
 				expect(value).toBe(GraphStyle.Angular);
 			});
 
@@ -1816,7 +1816,7 @@ describe('Config', () => {
 				const value = config.graph.style;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.style', 'graphStyle');
+				expectExtensionSettingToHaveBeenCalled('graph.style');
 				expect(value).toBe(GraphStyle.Rounded);
 			});
 
@@ -1825,7 +1825,7 @@ describe('Config', () => {
 				const value = config.graph.style;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('graph.style', 'graphStyle');
+				expectExtensionSettingToHaveBeenCalled('graph.style');
 				expect(value).toBe(GraphStyle.Rounded);
 			});
 		});
@@ -2173,7 +2173,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Active);
 		});
 
@@ -2185,7 +2185,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Beside);
 		});
 
@@ -2197,7 +2197,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.One);
 		});
 
@@ -2209,7 +2209,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Two);
 		});
 
@@ -2221,7 +2221,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Three);
 		});
 
@@ -2233,7 +2233,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Four);
 		});
 
@@ -2245,7 +2245,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Five);
 		});
 
@@ -2257,7 +2257,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Six);
 		});
 
@@ -2269,7 +2269,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Seven);
 		});
 
@@ -2281,7 +2281,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Eight);
 		});
 
@@ -2293,7 +2293,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Nine);
 		});
 
@@ -2305,7 +2305,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Active);
 		});
 
@@ -2314,7 +2314,7 @@ describe('Config', () => {
 			const value = config.openNewTabEditorGroup;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('openNewTabEditorGroup', 'openDiffTabLocation');
+			expectExtensionSettingToHaveBeenCalled('openNewTabEditorGroup');
 			expect(value).toBe(vscode.ViewColumn.Active);
 		});
 	});
@@ -2331,7 +2331,7 @@ describe('Config', () => {
 				const value = config.referenceLabels.combineLocalAndRemoteBranchLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels');
 				expect(value).toBe(true);
 			});
 
@@ -2343,7 +2343,7 @@ describe('Config', () => {
 				const value = config.referenceLabels.combineLocalAndRemoteBranchLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels');
 				expect(value).toBe(false);
 			});
 
@@ -2355,7 +2355,7 @@ describe('Config', () => {
 				const value = config.referenceLabels.combineLocalAndRemoteBranchLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels');
 				expect(value).toBe(true);
 			});
 
@@ -2367,7 +2367,7 @@ describe('Config', () => {
 				const value = config.referenceLabels.combineLocalAndRemoteBranchLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels');
 				expect(value).toBe(false);
 			});
 
@@ -2376,7 +2376,7 @@ describe('Config', () => {
 				const value = config.referenceLabels.combineLocalAndRemoteBranchLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.combineLocalAndRemoteBranchLabels');
 				expect(value).toBe(true);
 			});
 		});
@@ -2390,7 +2390,7 @@ describe('Config', () => {
 				const value = config.referenceLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.alignment', 'referenceLabelAlignment');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.alignment');
 				expect(value.branchLabelsAlignedToGraph).toBe(false);
 				expect(value.tagLabelsOnRight).toBe(false);
 			});
@@ -2403,7 +2403,7 @@ describe('Config', () => {
 				const value = config.referenceLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.alignment', 'referenceLabelAlignment');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.alignment');
 				expect(value.branchLabelsAlignedToGraph).toBe(false);
 				expect(value.tagLabelsOnRight).toBe(true);
 			});
@@ -2416,7 +2416,7 @@ describe('Config', () => {
 				const value = config.referenceLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.alignment', 'referenceLabelAlignment');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.alignment');
 				expect(value.branchLabelsAlignedToGraph).toBe(true);
 				expect(value.tagLabelsOnRight).toBe(true);
 			});
@@ -2429,7 +2429,7 @@ describe('Config', () => {
 				const value = config.referenceLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.alignment', 'referenceLabelAlignment');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.alignment');
 				expect(value.branchLabelsAlignedToGraph).toBe(false);
 				expect(value.tagLabelsOnRight).toBe(false);
 			});
@@ -2439,14 +2439,14 @@ describe('Config', () => {
 				const value = config.referenceLabels;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('referenceLabels.alignment', 'referenceLabelAlignment');
+				expectExtensionSettingToHaveBeenCalled('referenceLabels.alignment');
 				expect(value.branchLabelsAlignedToGraph).toBe(false);
 				expect(value.tagLabelsOnRight).toBe(false);
 			});
 		});
 	});
 
-	describe('fetchAvatars', testRenamedBooleanExtensionSetting('fetchAvatars', 'repository.commits.fetchAvatars', 'fetchAvatars', false));
+	describe('fetchAvatars', testBooleanExtensionSetting('fetchAvatars', 'repository.commits.fetchAvatars', false));
 
 	describe('initialLoadCommits', () => {
 		it('Should return the configured value', () => {
@@ -2457,7 +2457,7 @@ describe('Config', () => {
 			const value = config.initialLoadCommits;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.initialLoad', 'initialLoadCommits');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.initialLoad');
 			expect(value).toBe(600);
 		});
 
@@ -2466,7 +2466,7 @@ describe('Config', () => {
 			const value = config.initialLoadCommits;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.initialLoad', 'initialLoadCommits');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.initialLoad');
 			expect(value).toBe(300);
 		});
 	});
@@ -2480,7 +2480,7 @@ describe('Config', () => {
 			const value = config.loadMoreCommits;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.loadMore', 'loadMoreCommits');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.loadMore');
 			expect(value).toBe(200);
 		});
 
@@ -2489,12 +2489,12 @@ describe('Config', () => {
 			const value = config.loadMoreCommits;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.loadMore', 'loadMoreCommits');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.loadMore');
 			expect(value).toBe(100);
 		});
 	});
 
-	describe('loadMoreCommitsAutomatically', testRenamedBooleanExtensionSetting('loadMoreCommitsAutomatically', 'repository.commits.loadMoreAutomatically', 'loadMoreCommitsAutomatically', true));
+	describe('loadMoreCommitsAutomatically', testBooleanExtensionSetting('loadMoreCommitsAutomatically', 'repository.commits.loadMoreAutomatically', true));
 
 	describe('muteCommits', () => {
 		describe('commitsNotAncestorsOfHead', () => {
@@ -2506,7 +2506,7 @@ describe('Config', () => {
 				const value = config.muteCommits.commitsNotAncestorsOfHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead');
 				expect(value).toBe(true);
 			});
 
@@ -2518,7 +2518,7 @@ describe('Config', () => {
 				const value = config.muteCommits.commitsNotAncestorsOfHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead');
 				expect(value).toBe(false);
 			});
 
@@ -2530,7 +2530,7 @@ describe('Config', () => {
 				const value = config.muteCommits.commitsNotAncestorsOfHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead');
 				expect(value).toBe(true);
 			});
 
@@ -2542,7 +2542,7 @@ describe('Config', () => {
 				const value = config.muteCommits.commitsNotAncestorsOfHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead');
 				expect(value).toBe(false);
 			});
 
@@ -2551,7 +2551,7 @@ describe('Config', () => {
 				const value = config.muteCommits.commitsNotAncestorsOfHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.commitsThatAreNotAncestorsOfHead');
 				expect(value).toBe(false);
 			});
 		});
@@ -2565,7 +2565,7 @@ describe('Config', () => {
 				const value = config.muteCommits.mergeCommits;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits', 'muteMergeCommits');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits');
 				expect(value).toBe(true);
 			});
 
@@ -2577,7 +2577,7 @@ describe('Config', () => {
 				const value = config.muteCommits.mergeCommits;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits', 'muteMergeCommits');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits');
 				expect(value).toBe(false);
 			});
 
@@ -2589,7 +2589,7 @@ describe('Config', () => {
 				const value = config.muteCommits.mergeCommits;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits', 'muteMergeCommits');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits');
 				expect(value).toBe(true);
 			});
 
@@ -2601,7 +2601,7 @@ describe('Config', () => {
 				const value = config.muteCommits.mergeCommits;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits', 'muteMergeCommits');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits');
 				expect(value).toBe(false);
 			});
 
@@ -2610,7 +2610,7 @@ describe('Config', () => {
 				const value = config.muteCommits.mergeCommits;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits', 'muteMergeCommits');
+				expectExtensionSettingToHaveBeenCalled('repository.commits.mute.mergeCommits');
 				expect(value).toBe(true);
 			});
 		});
@@ -2625,7 +2625,7 @@ describe('Config', () => {
 			const value = config.commitOrder;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.order');
 			expect(value).toBe(CommitOrdering.Date);
 		});
 
@@ -2637,7 +2637,7 @@ describe('Config', () => {
 			const value = config.commitOrder;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.order');
 			expect(value).toBe(CommitOrdering.AuthorDate);
 		});
 
@@ -2649,7 +2649,7 @@ describe('Config', () => {
 			const value = config.commitOrder;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.order');
 			expect(value).toBe(CommitOrdering.Topological);
 		});
 
@@ -2661,7 +2661,7 @@ describe('Config', () => {
 			const value = config.commitOrder;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.order');
 			expect(value).toBe(CommitOrdering.Date);
 		});
 
@@ -2670,18 +2670,18 @@ describe('Config', () => {
 			const value = config.commitOrder;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('repository.commits.order', 'commitOrdering');
+			expectExtensionSettingToHaveBeenCalled('repository.commits.order');
 			expect(value).toBe(CommitOrdering.Date);
 		});
 	});
 
-	describe('fetchAndPrune', testRenamedBooleanExtensionSetting('fetchAndPrune', 'repository.fetchAndPrune', 'fetchAndPrune', false));
+	describe('fetchAndPrune', testBooleanExtensionSetting('fetchAndPrune', 'repository.fetchAndPrune', false));
 
 	describe('fetchAndPruneTags', testBooleanExtensionSetting('fetchAndPruneTags', 'repository.fetchAndPruneTags', false));
 
 	describe('trackRemoteTags', testBooleanExtensionSetting('trackRemoteTags', 'repository.trackRemoteTags', false));
 
-	describe('includeCommitsMentionedByReflogs', testRenamedBooleanExtensionSetting('includeCommitsMentionedByReflogs', 'repository.includeCommitsMentionedByReflogs', 'includeCommitsMentionedByReflogs', false));
+	describe('includeCommitsMentionedByReflogs', testBooleanExtensionSetting('includeCommitsMentionedByReflogs', 'repository.includeCommitsMentionedByReflogs', false));
 
 	describe('onRepoLoad', () => {
 		describe('scrollToHead', () => {
@@ -2693,7 +2693,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.scrollToHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead', 'openRepoToHead');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead');
 				expect(value).toBe(true);
 			});
 
@@ -2705,7 +2705,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.scrollToHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead', 'openRepoToHead');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead');
 				expect(value).toBe(false);
 			});
 
@@ -2717,7 +2717,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.scrollToHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead', 'openRepoToHead');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead');
 				expect(value).toBe(true);
 			});
 
@@ -2729,7 +2729,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.scrollToHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead', 'openRepoToHead');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead');
 				expect(value).toBe(false);
 			});
 
@@ -2738,7 +2738,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.scrollToHead;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead', 'openRepoToHead');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.scrollToHead');
 				expect(value).toBe(false);
 			});
 		});
@@ -2752,7 +2752,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.showCheckedOutBranch;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch');
 				expect(value).toBe(true);
 			});
 
@@ -2764,7 +2764,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.showCheckedOutBranch;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch');
 				expect(value).toBe(false);
 			});
 
@@ -2776,7 +2776,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.showCheckedOutBranch;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch');
 				expect(value).toBe(true);
 			});
 
@@ -2788,7 +2788,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.showCheckedOutBranch;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch');
 				expect(value).toBe(false);
 			});
 
@@ -2797,7 +2797,7 @@ describe('Config', () => {
 				const value = config.onRepoLoad.showCheckedOutBranch;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault');
+				expectExtensionSettingToHaveBeenCalled('repository.onLoad.showCheckedOutBranch');
 				expect(value).toBe(false);
 			});
 		});
@@ -2850,11 +2850,11 @@ describe('Config', () => {
 		});
 	});
 
-	describe('onlyFollowFirstParent', testRenamedBooleanExtensionSetting('onlyFollowFirstParent', 'repository.onlyFollowFirstParent', 'onlyFollowFirstParent', false));
+	describe('onlyFollowFirstParent', testBooleanExtensionSetting('onlyFollowFirstParent', 'repository.onlyFollowFirstParent', false));
 
-	describe('showCommitsOnlyReferencedByTags', testRenamedBooleanExtensionSetting('showCommitsOnlyReferencedByTags', 'repository.showCommitsOnlyReferencedByTags', 'showCommitsOnlyReferencedByTags', true));
+	describe('showCommitsOnlyReferencedByTags', testBooleanExtensionSetting('showCommitsOnlyReferencedByTags', 'repository.showCommitsOnlyReferencedByTags', true));
 
-	describe('showSignatureStatus', testRenamedBooleanExtensionSetting('showSignatureStatus', 'repository.commits.showSignatureStatus', 'showSignatureStatus', false));
+	describe('showSignatureStatus', testBooleanExtensionSetting('showSignatureStatus', 'repository.commits.showSignatureStatus', false));
 
 	describe('showRemoteBranches', testBooleanExtensionSetting('showRemoteBranches', 'repository.showRemoteBranches', true));
 
@@ -2862,17 +2862,17 @@ describe('Config', () => {
 
 	describe('showStashes', testBooleanExtensionSetting('showStashes', 'repository.showStashes', true));
 
-	describe('showTags', testRenamedBooleanExtensionSetting('showTags', 'repository.showTags', 'showTags', true));
+	describe('showTags', testBooleanExtensionSetting('showTags', 'repository.showTags', true));
 
-	describe('showUncommittedChanges', testRenamedBooleanExtensionSetting('showUncommittedChanges', 'repository.showUncommittedChanges', 'showUncommittedChanges', true));
+	describe('showUncommittedChanges', testBooleanExtensionSetting('showUncommittedChanges', 'repository.showUncommittedChanges', true));
 
-	describe('showUntrackedFiles', testRenamedBooleanExtensionSetting('showUntrackedFiles', 'repository.showUntrackedFiles', 'showUntrackedFiles', true));
+	describe('showUntrackedFiles', testBooleanExtensionSetting('showUntrackedFiles', 'repository.showUntrackedFiles', true));
 
 	describe('signCommits', testBooleanExtensionSetting('signCommits', 'repository.sign.commits', false));
 
 	describe('signTags', testBooleanExtensionSetting('signTags', 'repository.sign.tags', false));
 
-	describe('useMailmap', testRenamedBooleanExtensionSetting('useMailmap', 'repository.useMailmap', 'useMailmap', false));
+	describe('useMailmap', testBooleanExtensionSetting('useMailmap', 'repository.useMailmap', false));
 
 	describe('repoDropdownOrder', () => {
 		it('Should return RepoDropdownOrder.Name when the configuration value is "Name"', () => {
@@ -3050,97 +3050,6 @@ describe('Config', () => {
 		});
 	});
 
-	describe('getRenamedExtensionSetting', () => {
-		it('Should return new workspace value', () => {
-			// Setup
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: true,
-				globalValue: false
-			});
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: false,
-				globalValue: false
-			});
-
-			// Run
-			const value = config.fetchAndPrune;
-
-			// Assert
-			expect(value).toBe(true);
-		});
-
-		it('Should return old workspace value', () => {
-			// Setup
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: false
-			});
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: true,
-				globalValue: false
-			});
-
-			// Run
-			const value = config.fetchAndPrune;
-
-			// Assert
-			expect(value).toBe(true);
-		});
-
-		it('Should return new global value', () => {
-			// Setup
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: true
-			});
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: false
-			});
-
-			// Run
-			const value = config.fetchAndPrune;
-
-			// Assert
-			expect(value).toBe(true);
-		});
-
-		it('Should return old global value', () => {
-			// Setup
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: undefined
-			});
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: true
-			});
-
-			// Run
-			const value = config.fetchAndPrune;
-
-			// Assert
-			expect(value).toBe(true);
-		});
-
-		it('Should return the default value', () => {
-			// Setup
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: undefined
-			});
-			workspaceConfiguration.inspect.mockReturnValueOnce({
-				workspaceValue: undefined,
-				globalValue: undefined
-			});
-
-			// Run
-			const value = config.fetchAndPrune;
-
-			// Assert
-			expect(value).toBe(false);
-		});
-	});
 
 	function testBooleanExtensionSetting(configKey: keyof Config, section: string, defaultValue: boolean) {
 		return () => {
@@ -3168,97 +3077,12 @@ describe('Config', () => {
 				expect(value).toBe(false);
 			});
 
-			it('Should return TRUE when the configuration value is truthy', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, 5);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expect(workspaceConfiguration.get).toBeCalledWith(section, defaultValue);
-				expect(value).toBe(true);
-			});
-
-			it('Should return FALSE when the configuration value is falsy', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, 0);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expect(workspaceConfiguration.get).toBeCalledWith(section, defaultValue);
-				expect(value).toBe(false);
-			});
-
 			it('Should return the default value (' + (defaultValue ? 'TRUE' : 'FALSE') + ') when the configuration value is not set', () => {
 				// Run
 				const value = config[configKey];
 
 				// Assert
 				expect(workspaceConfiguration.get).toBeCalledWith(section, defaultValue);
-				expect(value).toBe(defaultValue);
-			});
-		};
-	}
-
-	function testRenamedBooleanExtensionSetting(configKey: keyof Config, section: string, oldSection: string, defaultValue: boolean) {
-		return () => {
-			it('Should return TRUE when the configuration value is TRUE', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, true);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled(section, oldSection);
-				expect(value).toBe(true);
-			});
-
-			it('Should return FALSE when the configuration value is FALSE', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, false);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled(section, oldSection);
-				expect(value).toBe(false);
-			});
-
-			it('Should return TRUE when the configuration value is truthy', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, 5);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled(section, oldSection);
-				expect(value).toBe(true);
-			});
-
-			it('Should return FALSE when the configuration value is falsy', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue(section, 0);
-
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled(section, oldSection);
-				expect(value).toBe(false);
-			});
-
-			it('Should return the default value (' + (defaultValue ? 'TRUE' : 'FALSE') + ') when the configuration value is not set', () => {
-				// Run
-				const value = config[configKey];
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled(section, oldSection);
 				expect(value).toBe(defaultValue);
 			});
 		};

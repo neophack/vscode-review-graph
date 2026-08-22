@@ -12,7 +12,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Checkout Branch',
+			title: strings.menuCheckoutBranch,
 
 			visible: visibility.checkout && view.gitBranchHead !== refName,
 
@@ -20,7 +20,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Compare with...',
+			title: strings.menuCompareWith,
 
 			visible: true,
 
@@ -58,7 +58,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Rename Branch' + ELLIPSIS,
+			title: strings.menuRenameBranch + ELLIPSIS,
 
 			visible: visibility.rename,
 
@@ -74,7 +74,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Create Branch' + ELLIPSIS,
+			title: strings.menuCreateBranch + ELLIPSIS,
 
 			visible: visibility.createBranch,
 
@@ -82,7 +82,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Delete Branch' + ELLIPSIS,
+			title: strings.menuDeleteBranch + ELLIPSIS,
 
 			visible: visibility.delete && view.gitBranchHead !== refName,
 
@@ -118,7 +118,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Merge into current branch' + ELLIPSIS,
+			title: strings.menuMergeIntoCurrentBranch + ELLIPSIS,
 
 			visible: visibility.merge && view.gitBranchHead !== refName,
 
@@ -126,7 +126,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Rebase current branch on Branch' + ELLIPSIS,
+			title: strings.menuRebaseOnBranch + ELLIPSIS,
 
 			visible: visibility.rebase && view.gitBranchHead !== refName,
 
@@ -134,7 +134,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Push Branch' + ELLIPSIS,
+			title: strings.menuPushBranch + ELLIPSIS,
 
 			visible: visibility.push && view.gitRemotes.length > 0,
 
@@ -220,7 +220,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Pull Branch' + ELLIPSIS,
+			title: strings.menuPullBranch + ELLIPSIS,
 
 			visible: visibility.pull && view.gitRemotes.length > 0,
 
@@ -252,7 +252,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Create Pull Request' + ELLIPSIS,
+			title: strings.menuCreatePullRequest + ELLIPSIS,
 
 			visible: visibility.createPullRequest && view.gitRepos[view.currentRepo].pullRequestConfig !== null,
 
@@ -276,7 +276,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Create Archive',
+			title: strings.menuCreateArchive,
 
 			visible: visibility.createArchive,
 
@@ -290,7 +290,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Select in Branches Dropdown',
+			title: strings.menuSelectInBranchesDropdown,
 
 			visible: visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown,
 
@@ -300,7 +300,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Unselect in Branches Dropdown',
+			title: strings.menuUnselectInBranchesDropdown,
 
 			visible: visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown,
 
@@ -312,7 +312,7 @@ function getBranchContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Copy Branch Name to Clipboard',
+			title: strings.menuCopyBranchName,
 
 			visible: visibility.copyName,
 
@@ -353,7 +353,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Add Tag' + ELLIPSIS,
+			title: strings.menuAddTag + ELLIPSIS,
 
 			visible: visibility.addTag,
 
@@ -361,7 +361,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Create Branch' + ELLIPSIS,
+			title: strings.menuCreateBranch + ELLIPSIS,
 
 			visible: visibility.createBranch,
 
@@ -373,7 +373,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Checkout' + (globalState.alwaysAcceptCheckoutCommit ? '' : ELLIPSIS),
+			title: strings.menuCheckout + (globalState.alwaysAcceptCheckoutCommit ? '' : ELLIPSIS),
 
 			visible: visibility.checkout,
 
@@ -405,7 +405,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Cherry Pick' + ELLIPSIS,
+			title: strings.menuCherryPick + ELLIPSIS,
 
 			visible: visibility.cherrypick,
 
@@ -491,7 +491,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Revert' + ELLIPSIS,
+			title: strings.menuRevert + ELLIPSIS,
 
 			visible: visibility.revert,
 
@@ -527,7 +527,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Reset Last Commit (Soft)' + ELLIPSIS,
+			title: strings.menuResetLastCommitSoft + ELLIPSIS,
 
 			visible: visibility.undo && hash === view.commitHead,
 
@@ -543,7 +543,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Edit Message' + ELLIPSIS,
+			title: strings.menuEditMessage + ELLIPSIS,
 
 			visible: visibility.editMessage,
 
@@ -553,7 +553,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 
 
-			title: 'Drop' + ELLIPSIS,
+			title: strings.menuDrop + ELLIPSIS,
 
 			visible: visibility.drop && view.graph.dropCommitPossible(view.commitLookup[hash]),
 
@@ -573,7 +573,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Merge into current branch' + ELLIPSIS,
+			title: strings.menuMergeIntoCurrentBranch + ELLIPSIS,
 
 			visible: visibility.merge,
 
@@ -581,7 +581,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Rebase current branch on this Commit' + ELLIPSIS,
+			title: strings.menuRebaseOnCommit + ELLIPSIS,
 
 			visible: visibility.rebase,
 
@@ -589,7 +589,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Reset current branch to this Commit' + ELLIPSIS,
+			title: strings.menuResetToCommit + ELLIPSIS,
 
 			visible: visibility.reset,
 
@@ -617,7 +617,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Copy Commit Hash to Clipboard',
+			title: strings.menuCopyCommitHash,
 
 			visible: visibility.copyHash,
 
@@ -631,7 +631,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Copy Commit Subject to Clipboard',
+			title: strings.menuCopyCommitSubject,
 
 			visible: visibility.copySubject,
 
@@ -647,7 +647,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'Select for Compare',
+			title: strings.menuSelectForCompare,
 
 			visible: hash !== UNCOMMITTED,
 
@@ -661,7 +661,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Compare with Selected Commit' + (view.compareSourceHash !== null ? ' (' + abbrevCommit(view.compareSourceHash) + ')' : '') + ELLIPSIS,
+			title: strings.menuCompareWithSelected + (view.compareSourceHash !== null ? ' (' + abbrevCommit(view.compareSourceHash) + ')' : '') + ELLIPSIS,
 
 			visible: view.compareSourceHash !== null && view.compareSourceHash !== hash,
 
@@ -677,7 +677,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Diff with Working Tree' + ELLIPSIS,
+			title: strings.menuDiffWithWorkingTree + ELLIPSIS,
 
 			visible: hash !== UNCOMMITTED && view.gitConfig !== null && (view.gitConfig.diffTool !== null || view.gitConfig.guiDiffTool !== null),
 
@@ -707,7 +707,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		{
 
-			title: 'View Gerrit Review Info',
+			title: strings.menuViewGerritReviewInfo,
 
 			visible: view.config.gerrit.enabled,
 
@@ -715,7 +715,7 @@ function getCommitContextMenuActions(view: GitGraphView, target: DialogTarget & 
 
 		}, {
 
-			title: 'Submit for Review' + ELLIPSIS,
+			title: strings.menuSubmitForReview + ELLIPSIS,
 
 			visible: view.config.gerrit.enabled && view.config.gerrit.showPushButton && hash === view.commitHead,
 
@@ -781,7 +781,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Checkout Branch' + ELLIPSIS,
+			title: strings.menuCheckoutBranch + ELLIPSIS,
 
 			visible: visibility.checkout,
 
@@ -789,7 +789,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		}, {
 
-			title: 'Create Branch' + ELLIPSIS,
+			title: strings.menuCreateBranch + ELLIPSIS,
 
 			visible: visibility.createBranch,
 
@@ -797,7 +797,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		}, {
 
-			title: 'Delete Remote Branch' + ELLIPSIS,
+			title: strings.menuDeleteRemoteBranch + ELLIPSIS,
 
 			visible: visibility.delete && remote !== '',
 
@@ -813,7 +813,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		}, {
 
-			title: 'Fetch into local branch' + ELLIPSIS,
+			title: strings.menuFetchIntoLocalBranch + ELLIPSIS,
 
 			visible: visibility.fetch && remote !== '' && view.gitBranches.includes(branchName) && view.gitBranchHead !== branchName,
 
@@ -839,7 +839,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		}, {
 
-			title: 'Merge into current branch' + ELLIPSIS,
+			title: strings.menuMergeIntoCurrentBranch + ELLIPSIS,
 
 			visible: visibility.merge,
 
@@ -847,7 +847,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		}, {
 
-			title: 'Pull into current branch' + ELLIPSIS,
+			title: strings.menuPullIntoCurrentBranch + ELLIPSIS,
 
 			visible: visibility.pull && remote !== '',
 
@@ -875,7 +875,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Create Pull Request',
+			title: strings.menuCreatePullRequest,
 
 			visible: visibility.createPullRequest && view.gitRepos[view.currentRepo].pullRequestConfig !== null && branchName !== 'HEAD' &&
 
@@ -917,7 +917,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Create Archive',
+			title: strings.menuCreateArchive,
 
 			visible: visibility.createArchive,
 
@@ -931,7 +931,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Select in Branches Dropdown',
+			title: strings.menuSelectInBranchesDropdown,
 
 			visible: visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown,
 
@@ -941,7 +941,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Unselect in Branches Dropdown',
+			title: strings.menuUnselectInBranchesDropdown,
 
 			visible: visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown,
 
@@ -953,7 +953,7 @@ function getRemoteBranchContextMenuActions(view: GitGraphView, remote: string, t
 
 		{
 
-			title: 'Copy Branch Name to Clipboard',
+			title: strings.menuCopyBranchName,
 
 			visible: visibility.copyName,
 
@@ -990,7 +990,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		{
 
-			title: 'Apply Stash' + ELLIPSIS,
+			title: strings.menuApplyStash + ELLIPSIS,
 
 			visible: visibility.apply,
 
@@ -1016,7 +1016,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		}, {
 
-			title: 'Create Branch from Stash' + ELLIPSIS,
+			title: strings.menuCreateBranchFromStash + ELLIPSIS,
 
 			visible: visibility.createBranch,
 
@@ -1032,7 +1032,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		}, {
 
-			title: 'Pop Stash' + ELLIPSIS,
+			title: strings.menuPopStash + ELLIPSIS,
 
 			visible: visibility.pop,
 
@@ -1058,7 +1058,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		}, {
 
-			title: 'Drop Stash' + ELLIPSIS,
+			title: strings.menuDropStash + ELLIPSIS,
 
 			visible: visibility.drop,
 
@@ -1078,7 +1078,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		{
 
-			title: 'Copy Stash Name to Clipboard',
+			title: strings.menuCopyStashName,
 
 			visible: visibility.copyName,
 
@@ -1090,7 +1090,7 @@ function getStashContextMenuActions(view: GitGraphView, target: DialogTarget & R
 
 		}, {
 
-			title: 'Copy Stash Hash to Clipboard',
+			title: strings.menuCopyStashHash,
 
 			visible: visibility.copyHash,
 
@@ -1115,7 +1115,7 @@ function getTagContextMenuActions(view: GitGraphView, isAnnotated: boolean, targ
 
 		{
 
-			title: 'View Details',
+			title: strings.menuViewDetails,
 
 			visible: visibility.viewDetails && isAnnotated,
 
@@ -1127,7 +1127,7 @@ function getTagContextMenuActions(view: GitGraphView, isAnnotated: boolean, targ
 
 		}, {
 
-			title: 'Delete Tag' + ELLIPSIS,
+			title: strings.menuDeleteTag + ELLIPSIS,
 
 			visible: visibility.delete,
 
@@ -1169,7 +1169,7 @@ function getTagContextMenuActions(view: GitGraphView, isAnnotated: boolean, targ
 
 		}, {
 
-			title: 'Push Tag' + ELLIPSIS,
+			title: strings.menuPushTag + ELLIPSIS,
 
 			visible: visibility.push && view.gitRemotes.length > 0,
 
@@ -1227,7 +1227,7 @@ function getTagContextMenuActions(view: GitGraphView, isAnnotated: boolean, targ
 
 		{
 
-			title: 'Create Archive',
+			title: strings.menuCreateArchive,
 
 			visible: visibility.createArchive,
 
@@ -1241,7 +1241,7 @@ function getTagContextMenuActions(view: GitGraphView, isAnnotated: boolean, targ
 
 		{
 
-			title: 'Copy Tag Name to Clipboard',
+			title: strings.menuCopyTagName,
 
 			visible: visibility.copyName,
 
@@ -1266,7 +1266,7 @@ function getUncommittedChangesContextMenuActions(view: GitGraphView, target: Dia
 
 		{
 
-			title: 'Stash uncommitted changes' + ELLIPSIS,
+			title: strings.menuStashUncommitted + ELLIPSIS,
 
 			visible: visibility.stash,
 
@@ -1292,7 +1292,7 @@ function getUncommittedChangesContextMenuActions(view: GitGraphView, target: Dia
 
 		{
 
-			title: 'Reset uncommitted changes' + ELLIPSIS,
+			title: strings.menuResetUncommitted + ELLIPSIS,
 
 			visible: visibility.reset,
 
@@ -1314,7 +1314,7 @@ function getUncommittedChangesContextMenuActions(view: GitGraphView, target: Dia
 
 		}, {
 
-			title: 'Clean untracked files' + ELLIPSIS,
+			title: strings.menuCleanUntracked + ELLIPSIS,
 
 			visible: visibility.clean,
 
@@ -1334,7 +1334,7 @@ function getUncommittedChangesContextMenuActions(view: GitGraphView, target: Dia
 
 		{
 
-			title: 'Open Source Control View',
+			title: strings.menuOpenSourceControlView,
 
 			visible: visibility.openSourceControlView,
 
@@ -1383,7 +1383,7 @@ function getViewIssueAction(view: GitGraphView, refName: string, visible: boolea
 
 	return {
 
-		title: 'View Issue' + (issueLinks.length > 1 ? ELLIPSIS : ''),
+		title: strings.menuViewIssue + (issueLinks.length > 1 ? ELLIPSIS : ''),
 
 		visible: issueLinks.length > 0,
 

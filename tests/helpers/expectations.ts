@@ -1,8 +1,7 @@
 import { mocks } from '../mocks/vscode';
 
-export function expectRenamedExtensionSettingToHaveBeenCalled(newSection: string, oldSection: string) {
-	expect(mocks.workspaceConfiguration.inspect).toBeCalledWith(newSection);
-	expect(mocks.workspaceConfiguration.inspect).toBeCalledWith(oldSection);
+export function expectExtensionSettingToHaveBeenCalled(section: string) {
+	expect(mocks.workspaceConfiguration.get).toBeCalledWith(section, expect.anything());
 }
 
 export function waitForExpect(expect: () => void) {

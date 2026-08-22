@@ -9,6 +9,7 @@ import { CodeReviewData, CodeReviews, ExtensionState } from './extensionState';
 import { GitGraphView } from './gitGraphView';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
+import { exportCodeReviewState, importCodeReviewState } from './reviewStateTransfer';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, VsCodeVersionRequirement, abbrevCommit, abbrevText, copyToClipboard, doesVersionMeetRequirement, getExtensionVersion, getPathFromStr, getPathFromUri, getRelativeTimeDiff, getRepoName, getSortedRepositoryPaths, isPathInWorkspace, openFile, resolveToSymbolicPath, showErrorMessage, showInformationMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { GgEvent } from './utils/event';
@@ -56,6 +57,8 @@ export class CommandManager extends Disposable {
 		this.registerCommand('review-graph.endAllWorkspaceCodeReviews', () => this.endAllWorkspaceCodeReviews());
 		this.registerCommand('review-graph.endSpecificWorkspaceCodeReview', () => this.endSpecificWorkspaceCodeReview());
 		this.registerCommand('review-graph.resumeWorkspaceCodeReview', () => this.resumeWorkspaceCodeReview());
+		this.registerCommand('review-graph.exportCodeReviewState', (arg) => this.exportCodeReviewState(arg));
+		this.registerCommand('review-graph.importCodeReviewState', (arg) => this.importCodeReviewState(arg));
 		this.registerCommand('review-graph.version', () => this.version());
 		this.registerCommand('review-graph.searchCommits', () => this.searchCommits());
 		this.registerCommand('review-graph.openFile', (arg) => this.openFile(arg));
@@ -462,6 +465,26 @@ export class CommandManager extends Disposable {
 		}, () => {
 			showErrorMessage('An unexpected error occurred while running the command "Resume a specific Code Review in Workspace...".');
 		});
+	}
+
+	/**
+	 * The method run when the `review-graph.exportCodeReviewState` command is invoked.
+	 */
+	private async exportCodeReviewState(arg: any) {
+		const repo = await this.getRepoFromCommandArg(arg);
+		if (repo === null) return;
+		const error = await exportCodeReviewState(this.extensionState, repo);
+		if (error !== null) showErrorMessage('Unable to Export Code Review State: ' + error);
+	}
+
+	/**
+	 * The method run when the `review-graph.importCodeReviewState` command is invoked.
+	 */
+	private async importCodeReviewState(arg: any) {
+		const repo = await this.getRepoFromCommandArg(arg);
+		if (repo === null) return;
+		const error = await importCodeReviewState(this.extensionState, repo);
+		if (error !== null) showErrorMessage('Unable to Import Code Review State: ' + error);
 	}
 
 	/**

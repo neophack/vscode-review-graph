@@ -26,7 +26,7 @@ function getGerritBadgeHtml(view: GitGraphView, state: GG.GerritChangeState) {
 
 	const meta = view.config.gerrit.showMetaCommits !== 'off'
 
-		? '<span class="gg-meta-chip' + (expanded ? ' expanded' : '') + '" data-change="' + state.change + '" title="Gerrit review events (click to toggle)">' + SVG_ICONS.chevronDown + '</span>'
+		? '<span class="gg-meta-chip' + (expanded ? ' expanded' : '') + '" data-change="' + state.change + '" title="' + strings.gerritMetaChipTitle + '">' + SVG_ICONS.chevronDown + '</span>'
 
 		: '';
 
@@ -104,7 +104,7 @@ function showGerritReviewInfo(view: GitGraphView, hash: string) {
 
 	if (state === undefined) {
 
-		dialog.showError('Gerrit Review', 'No Gerrit review information is available for this commit. Only commits of changes that pass the status filter (and the latest fetched changes) have review information.', 'Close', null);
+		dialog.showError(strings.gerritReviewDialogTitle, strings.gerritNoReviewInfo, strings.dialogClose, null);
 
 		return;
 
@@ -119,7 +119,7 @@ function showGerritDialog(_view: GitGraphView, state: GG.GerritChangeState) {
 
 	const score = formatGerritScore;
 
-	const statusText = state.status === 'merged' ? 'Merged' : state.status === 'abandoned' ? 'Abandoned' : (state.wip ? 'Work in Progress' : 'Open (awaiting review)');
+	const statusText = state.status === 'merged' ? strings.gerritStatusMerged : state.status === 'abandoned' ? strings.gerritStatusAbandoned : (state.wip ? strings.gerritStatusWip : strings.gerritStatusOpen);
 
 	const icons = GERRIT_EVENT_ICONS;
 
@@ -141,7 +141,7 @@ function showGerritDialog(_view: GitGraphView, state: GG.GerritChangeState) {
 
 		const detail = hasFull ? '<pre class="gg-event-detail">' + escapeHtml(event.rawFull) + '</pre>' : '';
 
-		timeline += '<div class="gg-event' + (hasFull ? ' gg-event-expandable' : '') + '"' + (hasFull ? ' title="Click to toggle the full NoteDb record of this event"' : '') + '>' +
+		timeline += '<div class="gg-event' + (hasFull ? ' gg-event-expandable' : '') + '"' + (hasFull ? ' title="' + strings.gerritToggleNoteDb + '"' : '') + '>' +
 
 			'<div class="gg-event-row">' +
 
@@ -175,7 +175,7 @@ function showGerritDialog(_view: GitGraphView, state: GG.GerritChangeState) {
 
 		'<div class="gg-timeline">' + timeline + '</div>' +
 
-		(hasDetails ? '<span class="gg-hint">Click an event to show its full NoteDb record (patchset, commit hash, labels and status footers).</span>' : '')
+		(hasDetails ? '<span class="gg-hint">' + strings.gerritEventsHint + '</span>' : '')
 
 	);
 
@@ -308,9 +308,9 @@ function initGerritControls(view: GitGraphView) {
 
 	if (amendBtn !== null) {
 
-		amendBtn.innerHTML = SVG_ICONS.pencil + '<span>Amend</span>';
+		amendBtn.innerHTML = SVG_ICONS.pencil + '<span>' + strings.gerritAmendLabel + '</span>';
 
-		amendBtn.title = 'Amend Change-Id: add a Gerrit Change-Id footer to HEAD (only possible when HEAD has no Change-Id yet and hasn\'t been pushed to any remote)';
+		amendBtn.title = strings.gerritAmendTitle;
 
 		amendBtn.addEventListener('click', () => gerritAmendChangeIdAction(view));
 
@@ -326,9 +326,9 @@ function initGerritControls(view: GitGraphView) {
 
 		if (view.config.gerrit.showPushButton) {
 
-			submitBtn.innerHTML = SVG_ICONS.review + '<span>Submit</span>';
+			submitBtn.innerHTML = SVG_ICONS.review + '<span>' + strings.gerritSubmitLabel + '</span>';
 
-			submitBtn.title = 'Submit for Review: push HEAD to refs/for/<branch> for Gerrit review';
+			submitBtn.title = strings.gerritSubmitTitle;
 
 			submitBtn.addEventListener('click', () => gerritSubmitReviewAction(view));
 
@@ -348,9 +348,9 @@ function initGerritControls(view: GitGraphView) {
 
 	if (clearRefsBtn !== null) {
 
-		clearRefsBtn.innerHTML = SVG_ICONS.trash + '<span>Clear</span>';
+		clearRefsBtn.innerHTML = SVG_ICONS.trash + '<span>' + strings.gerritClearLabel + '</span>';
 
-		clearRefsBtn.title = 'Clear Refs: delete downloaded Gerrit change refs (refs/remotes/' + view.config.gerrit.remote + '/changes/*)';
+		clearRefsBtn.title = formatStr(strings.gerritClearRefsTitle, view.config.gerrit.remote);
 
 		clearRefsBtn.addEventListener('click', () => gerritClearRefsAction(view));
 
@@ -364,9 +364,9 @@ function initGerritControls(view: GitGraphView) {
 
 	if (hooksBtn !== null) {
 
-		hooksBtn.innerHTML = SVG_ICONS.download + '<span>Hooks</span>';
+		hooksBtn.innerHTML = SVG_ICONS.download + '<span>' + strings.gerritHooksLabel + '</span>';
 
-		hooksBtn.title = 'Hooks: show the status of this repository\'s Git hooks (and install the Gerrit commit-msg hook)';
+		hooksBtn.title = strings.gerritHooksTitle;
 
 		hooksBtn.addEventListener('click', () => gerritHooksAction(view));
 
@@ -382,11 +382,11 @@ function initGerritControls(view: GitGraphView) {
 
 	const chips: { status: keyof GG.GerritStatusFilter, label: string }[] = [
 
-		{ status: 'new', label: 'Open' }, { status: 'merged', label: 'Merged' }, { status: 'abandoned', label: 'Abandoned' }, { status: 'wip', label: 'WIP' }
+		{ status: 'new', label: strings.gerritChipOpen }, { status: 'merged', label: strings.gerritChipMerged }, { status: 'abandoned', label: strings.gerritChipAbandoned }, { status: 'wip', label: strings.gerritChipWip }
 
 	];
 
-	filterControl.innerHTML = chips.map((chip) => '<span class="gerritFilterChip" data-status="' + chip.status + '" title="Show Gerrit changes with status: ' + chip.label + '">' + chip.label + '</span>').join('');
+	filterControl.innerHTML = chips.map((chip) => '<span class="gerritFilterChip" data-status="' + chip.status + '" title="' + formatStr(strings.gerritFilterChipTitle, chip.label) + '">' + chip.label + '</span>').join('');
 
 	for (const elem of Array.from(filterControl.querySelectorAll('.gerritFilterChip'))) {
 

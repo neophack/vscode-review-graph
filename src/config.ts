@@ -21,6 +21,7 @@ import {
 	KeybindingConfig,
 	MuteCommitsConfig,
 	OnRepoLoadConfig,
+	PullRequestsConfig,
 	RefLabelAlignment,
 	ReferenceLabelsConfig,
 	RepoDropdownOrder,
@@ -65,12 +66,12 @@ class Config {
 	 */
 	get commitDetailsView(): CommitDetailsViewConfig {
 		return {
-			autoCenter: !!this.getRenamedExtensionSetting('commitDetailsView.autoCenter', 'autoCenterCommitDetailsView', true),
-			fileTreeCompactFolders: !!this.getRenamedExtensionSetting('commitDetailsView.fileView.fileTree.compactFolders', 'commitDetailsViewFileTreeCompactFolders', true),
-			fileViewType: this.getRenamedExtensionSetting<string>('commitDetailsView.fileView.type', 'defaultFileViewType', 'File Tree') === 'File List'
+			autoCenter: !!this.config.get('commitDetailsView.autoCenter', true),
+			fileTreeCompactFolders: !!this.config.get('commitDetailsView.fileView.fileTree.compactFolders', true),
+			fileViewType: this.config.get<string>('commitDetailsView.fileView.type', 'File Tree') === 'File List'
 				? FileViewType.List
 				: FileViewType.Tree,
-			location: this.getRenamedExtensionSetting<string>('commitDetailsView.location', 'commitDetailsViewLocation', 'Inline') === 'Docked to Bottom'
+			location: this.config.get<string>('commitDetailsView.location', 'Inline') === 'Docked to Bottom'
 				? CommitDetailsViewLocation.DockedToBottom
 				: CommitDetailsViewLocation.Inline
 		};
@@ -153,6 +154,15 @@ class Config {
 	}
 
 	/**
+	 * Get the value of the `review-graph.pullRequests.enabled` Extension Setting.
+	 */
+	get pullRequests(): PullRequestsConfig {
+		return {
+			enabled: !!this.config.get('pullRequests.enabled', false)
+		};
+	}
+
+	/**
 	 * Get the value of the `review-graph.customPullRequestProviders` Extension Setting.
 	 */
 	get customPullRequestProviders(): CustomPullRequestProvider[] {
@@ -168,7 +178,7 @@ class Config {
 	 * Get the value of the `review-graph.date.format` Extension Setting.
 	 */
 	get dateFormat(): DateFormat {
-		let configValue = this.getRenamedExtensionSetting<string>('date.format', 'dateFormat', 'Date & Time'), type = DateFormatType.DateAndTime, iso = false;
+		let configValue = this.config.get<string>('date.format', 'Date & Time'), type = DateFormatType.DateAndTime, iso = false;
 		if (configValue === 'Relative') {
 			type = DateFormatType.Relative;
 		} else {
@@ -182,7 +192,7 @@ class Config {
 	 * Get the value of the `review-graph.date.type` Extension Setting.
 	 */
 	get dateType() {
-		return this.getRenamedExtensionSetting<string>('date.type', 'dateType', 'Author Date') === 'Commit Date'
+		return this.config.get<string>('date.type', 'Author Date') === 'Commit Date'
 			? DateType.Commit
 			: DateType.Author;
 	}
@@ -299,12 +309,12 @@ class Config {
 	 * Get the graph configuration from the Extension Settings.
 	 */
 	get graph(): GraphConfig {
-		const colours = this.getRenamedExtensionSetting<string[]>('graph.colours', 'graphColours', []);
+		const colours = this.config.get<string[]>('graph.colours', []);
 		return {
 			colours: Array.isArray(colours) && colours.length > 0
 				? colours.filter((v) => v.match(/^\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|rgb[a]?\s*\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\))\s*$/) !== null)
 				: ['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00'],
-			style: this.getRenamedExtensionSetting<string>('graph.style', 'graphStyle', 'rounded') === 'angular'
+			style: this.config.get<string>('graph.style', 'rounded') === 'angular'
 				? GraphStyle.Angular
 				: GraphStyle.Rounded,
 			fontSize: this.config.get<number>('graph.fontSize', 13),
@@ -314,6 +324,13 @@ class Config {
 				? GraphUncommittedChangesStyle.OpenCircleAtTheCheckedOutCommit
 				: GraphUncommittedChangesStyle.OpenCircleAtTheUncommittedChanges
 		};
+	}
+
+	/**
+	 * Get the value of the `review-graph.interfaceLanguage` Extension Setting.
+	 */
+	get interfaceLanguage(): 'en' | 'zh-cn' {
+		return this.config.get<string>('interfaceLanguage', 'en') === 'zh-cn' ? 'zh-cn' : 'en';
 	}
 
 	/**
@@ -353,7 +370,7 @@ class Config {
 	 * Get the value of the `review-graph.openNewTabEditorGroup` Extension Setting.
 	 */
 	get openNewTabEditorGroup(): vscode.ViewColumn {
-		const location = this.getRenamedExtensionSetting<string>('openNewTabEditorGroup', 'openDiffTabLocation', 'Active');
+		const location = this.config.get<string>('openNewTabEditorGroup', 'Active');
 		return typeof location === 'string' && typeof VIEW_COLUMN_MAPPING[location] !== 'undefined'
 			? VIEW_COLUMN_MAPPING[location]
 			: vscode.ViewColumn.Active;
@@ -370,7 +387,7 @@ class Config {
 	 * Get the reference label configuration from the Extension Settings.
 	 */
 	get referenceLabels(): ReferenceLabelsConfig {
-		const alignmentConfigValue = this.getRenamedExtensionSetting<string>('referenceLabels.alignment', 'referenceLabelAlignment', 'Normal');
+		const alignmentConfigValue = this.config.get<string>('referenceLabels.alignment', 'Normal');
 		const alignment = alignmentConfigValue === 'Branches (on the left) & Tags (on the right)'
 			? RefLabelAlignment.BranchesOnLeftAndTagsOnRight
 			: alignmentConfigValue === 'Branches (aligned to the graph) & Tags (on the right)'
@@ -378,7 +395,7 @@ class Config {
 				: RefLabelAlignment.Normal;
 		return {
 			branchLabelsAlignedToGraph: alignment === RefLabelAlignment.BranchesAlignedToGraphAndTagsOnRight,
-			combineLocalAndRemoteBranchLabels: !!this.getRenamedExtensionSetting('referenceLabels.combineLocalAndRemoteBranchLabels', 'combineLocalAndRemoteBranchLabels', true),
+			combineLocalAndRemoteBranchLabels: !!this.config.get('referenceLabels.combineLocalAndRemoteBranchLabels', true),
 			tagLabelsOnRight: alignment !== RefLabelAlignment.Normal
 		};
 	}
@@ -387,14 +404,14 @@ class Config {
 	 * Get the value of the `review-graph.repository.commits.fetchAvatars` Extension Setting.
 	 */
 	get fetchAvatars() {
-		return !!this.getRenamedExtensionSetting('repository.commits.fetchAvatars', 'fetchAvatars', false);
+		return !!this.config.get('repository.commits.fetchAvatars', false);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.commits.initialLoad` Extension Setting.
 	 */
 	get initialLoadCommits() {
-		return this.getRenamedExtensionSetting('repository.commits.initialLoad', 'initialLoadCommits', 300);
+		return this.config.get('repository.commits.initialLoad', 300);
 	}
 
 
@@ -402,14 +419,14 @@ class Config {
 	 * Get the value of the `review-graph.repository.commits.loadMore` Extension Setting.
 	 */
 	get loadMoreCommits() {
-		return this.getRenamedExtensionSetting('repository.commits.loadMore', 'loadMoreCommits', 100);
+		return this.config.get('repository.commits.loadMore', 100);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.commits.loadMoreAutomatically` Extension Setting.
 	 */
 	get loadMoreCommitsAutomatically() {
-		return !!this.getRenamedExtensionSetting('repository.commits.loadMoreAutomatically', 'loadMoreCommitsAutomatically', true);
+		return !!this.config.get('repository.commits.loadMoreAutomatically', true);
 	}
 
 	/**
@@ -417,8 +434,8 @@ class Config {
 	 */
 	get muteCommits(): MuteCommitsConfig {
 		return {
-			commitsNotAncestorsOfHead: !!this.getRenamedExtensionSetting('repository.commits.mute.commitsThatAreNotAncestorsOfHead', 'muteCommitsThatAreNotAncestorsOfHead', false),
-			mergeCommits: !!this.getRenamedExtensionSetting('repository.commits.mute.mergeCommits', 'muteMergeCommits', true)
+			commitsNotAncestorsOfHead: !!this.config.get('repository.commits.mute.commitsThatAreNotAncestorsOfHead', false),
+			mergeCommits: !!this.config.get('repository.commits.mute.mergeCommits', true)
 		};
 	}
 
@@ -426,7 +443,7 @@ class Config {
 	 * Get the value of the `review-graph.repository.commits.order` Extension Setting.
 	 */
 	get commitOrder() {
-		const ordering = this.getRenamedExtensionSetting<string>('repository.commits.order', 'commitOrdering', 'date');
+		const ordering = this.config.get<string>('repository.commits.order', 'date');
 		return ordering === 'author-date'
 			? CommitOrdering.AuthorDate
 			: ordering === 'topo'
@@ -438,14 +455,14 @@ class Config {
 	 * Get the value of the `review-graph.repository.commits.showSignatureStatus` Extension Setting.
 	 */
 	get showSignatureStatus() {
-		return !!this.getRenamedExtensionSetting('repository.commits.showSignatureStatus', 'showSignatureStatus', false);
+		return !!this.config.get('repository.commits.showSignatureStatus', false);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.fetchAndPrune` Extension Setting.
 	 */
 	get fetchAndPrune() {
-		return !!this.getRenamedExtensionSetting('repository.fetchAndPrune', 'fetchAndPrune', false);
+		return !!this.config.get('repository.fetchAndPrune', false);
 	}
 
 	/**
@@ -466,7 +483,7 @@ class Config {
 	 * Get the value of the `review-graph.repository.includeCommitsMentionedByReflogs` Extension Setting.
 	 */
 	get includeCommitsMentionedByReflogs() {
-		return !!this.getRenamedExtensionSetting('repository.includeCommitsMentionedByReflogs', 'includeCommitsMentionedByReflogs', false);
+		return !!this.config.get('repository.includeCommitsMentionedByReflogs', false);
 	}
 
 	/**
@@ -475,8 +492,8 @@ class Config {
 	get onRepoLoad(): OnRepoLoadConfig {
 		const branches = this.config.get('repository.onLoad.showSpecificBranches', []);
 		return {
-			scrollToHead: !!this.getRenamedExtensionSetting('repository.onLoad.scrollToHead', 'openRepoToHead', false),
-			showCheckedOutBranch: !!this.getRenamedExtensionSetting('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault', false),
+			scrollToHead: !!this.config.get('repository.onLoad.scrollToHead', false),
+			showCheckedOutBranch: !!this.config.get('repository.onLoad.showCheckedOutBranch', false),
 			showSpecificBranches: Array.isArray(branches)
 				? branches.filter((branch) => typeof branch === 'string')
 				: []
@@ -487,14 +504,14 @@ class Config {
 	 * Get the value of the `review-graph.repository.onlyFollowFirstParent` Extension Setting.
 	 */
 	get onlyFollowFirstParent() {
-		return !!this.getRenamedExtensionSetting('repository.onlyFollowFirstParent', 'onlyFollowFirstParent', false);
+		return !!this.config.get('repository.onlyFollowFirstParent', false);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.showCommitsOnlyReferencedByTags` Extension Setting.
 	 */
 	get showCommitsOnlyReferencedByTags() {
-		return !!this.getRenamedExtensionSetting('repository.showCommitsOnlyReferencedByTags', 'showCommitsOnlyReferencedByTags', true);
+		return !!this.config.get('repository.showCommitsOnlyReferencedByTags', true);
 	}
 
 	/**
@@ -529,21 +546,21 @@ class Config {
 	 * Get the value of the `review-graph.repository.showTags` Extension Setting.
 	 */
 	get showTags() {
-		return !!this.getRenamedExtensionSetting('repository.showTags', 'showTags', true);
+		return !!this.config.get('repository.showTags', true);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.showUncommittedChanges` Extension Setting.
 	 */
 	get showUncommittedChanges() {
-		return !!this.getRenamedExtensionSetting('repository.showUncommittedChanges', 'showUncommittedChanges', true);
+		return !!this.config.get('repository.showUncommittedChanges', true);
 	}
 
 	/**
 	 * Get the value of the `review-graph.repository.showUntrackedFiles` Extension Setting.
 	 */
 	get showUntrackedFiles() {
-		return !!this.getRenamedExtensionSetting('repository.showUntrackedFiles', 'showUntrackedFiles', true);
+		return !!this.config.get('repository.showUntrackedFiles', true);
 	}
 
 	/**
@@ -564,7 +581,7 @@ class Config {
 	 * Get the value of the `review-graph.repository.useMailmap` Extension Setting.
 	 */
 	get useMailmap() {
-		return !!this.getRenamedExtensionSetting('repository.useMailmap', 'useMailmap', false);
+		return !!this.config.get('repository.useMailmap', false);
 	}
 
 	/**
@@ -656,22 +673,6 @@ class Config {
 				return configValue.substring(11).toLowerCase();
 			}
 		}
-		return defaultValue;
-	}
-
-	/**
-	 * Get the value of a renamed extension setting.
-	 * @param newSection The section locating the new setting.
-	 * @param oldSection The section location the old setting.
-	 * @param defaultValue The default value of the setting.
-	 * @returns The value of the extension setting.
-	 */
-	private getRenamedExtensionSetting<T>(newSection: string, oldSection: string, defaultValue: T) {
-		const newValues = this.config.inspect<T>(newSection), oldValues = this.config.inspect<T>(oldSection);
-		if (typeof newValues !== 'undefined' && typeof newValues.workspaceValue !== 'undefined') return newValues.workspaceValue;
-		if (typeof oldValues !== 'undefined' && typeof oldValues.workspaceValue !== 'undefined') return oldValues.workspaceValue;
-		if (typeof newValues !== 'undefined' && typeof newValues.globalValue !== 'undefined') return newValues.globalValue;
-		if (typeof oldValues !== 'undefined' && typeof oldValues.globalValue !== 'undefined') return oldValues.globalValue;
 		return defaultValue;
 	}
 }
