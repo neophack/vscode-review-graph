@@ -3,7 +3,7 @@
 	position:fixed;
 	top:-158px;
 	right:28px;
-	width:400px;
+	width:840px;
 	max-width:calc(100vw - 56px);
 	box-sizing:border-box;
 	min-height:146px;
@@ -35,6 +35,84 @@
 	font-size:16px;
 	line-height:24px;
 	text-align:center;
+}
+
+/* The Settings Widget is split into two independently scrollable columns:
+   the settings of the repository open in the view, and the Global (User) Settings. */
+#settingsColumns{
+	display:flex;
+	align-items:flex-start;
+	gap:10px;
+}
+.settingsColumn{
+	flex:1 1 0;
+	min-width:0;
+	max-height:calc(90vh - 60px);
+	overflow-x:hidden;
+	overflow-y:auto;
+}
+.settingsColumn + .settingsColumn{
+	border-left:1px solid var(--vscode-editorSuggestWidget-foreground);
+	border-left-color:rgba(128,128,128,0.3);
+	padding-left:10px;
+}
+.settingsColumnTitle{
+	position:sticky;
+	top:0;
+	z-index:1;
+	margin:0 0 2px 0;
+	padding:4px 0 6px 0;
+	font-size:13px;
+	line-height:18px;
+	text-align:center;
+	text-transform:uppercase;
+	letter-spacing:0.6px;
+	opacity:0.75;
+	background-color:var(--vscode-editorWidget-background);
+	cursor:default;
+}
+
+/* Stack the columns when the widget is too narrow to show them side by side */
+@media (max-width:719px){
+	#settingsColumns{
+		display:block;
+	}
+	.settingsColumn{
+		max-height:none;
+		overflow-y:visible;
+	}
+	.settingsColumn + .settingsColumn{
+		border-left:none;
+		padding-left:0;
+	}
+}
+
+/* Controls bound to a Global Setting */
+.settingsGlobalCheckbox{
+	display:inline-block;
+	margin:3px 0;
+	cursor:pointer;
+}
+.settingsGlobalSelect, .settingsGlobalNumber{
+	max-width:100%;
+	color:var(--vscode-editorSuggestWidget-foreground);
+	background-color:var(--vscode-input-background);
+	border:1px solid var(--vscode-input-border, transparent);
+	font-family:inherit;
+	font-size:12px;
+	padding:1px 2px;
+}
+.settingsGlobalNumber{
+	width:80px;
+}
+.settingsInputUnit{
+	margin-left:5px;
+	opacity:0.7;
+}
+.settingsSubLabel{
+	margin:6px 0 2px 0;
+	font-weight:bold;
+	opacity:0.85;
 }
 
 .settingsSection{

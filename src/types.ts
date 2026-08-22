@@ -321,6 +321,7 @@ export interface GitGraphViewConfig {
 	readonly customEmojiShortcodeMappings: ReadonlyArray<CustomEmojiShortcodeMapping>;
 	readonly customPullRequestProviders: ReadonlyArray<CustomPullRequestProvider>;
 	readonly dateFormat: DateFormat;
+	readonly dateType: DateType;
 	readonly defaultColumnVisibility: DefaultColumnVisibility;
 	readonly dialogDefaults: DialogDefaults;
 	readonly enhancedAccessibility: boolean;
@@ -346,9 +347,13 @@ export interface GitGraphViewConfig {
 	readonly repoDropdownOrder: RepoDropdownOrder;
 	readonly showCommitBodyInline: boolean;
 	readonly showRemoteBranches: boolean;
+	readonly showRemoteHeads: boolean;
 	readonly showStashes: boolean;
 	readonly showTags: boolean;
+	readonly showUncommittedChanges: boolean;
+	readonly showUntrackedFiles: boolean;
 	readonly stickyHeader: boolean;
+	readonly trackRemoteTags: boolean;
 }
 
 export interface GitGraphViewGlobalState {
@@ -1499,6 +1504,20 @@ export interface ResponseSetInterfaceLanguage extends ResponseWithErrorInfo {
 	readonly command: 'setInterfaceLanguage';
 }
 
+/** The type of a Global Setting that can be written from the Settings Widget. */
+export type GlobalSettingValue = boolean | number | string | GerritStatusFilter;
+
+export interface RequestSetGlobalSetting extends BaseMessage {
+	readonly command: 'setGlobalSetting';
+	/** The key of the setting, relative to the `review-graph` section (e.g. "graph.style"). */
+	readonly setting: string;
+	readonly value: GlobalSettingValue;
+}
+export interface ResponseSetGlobalSetting extends ResponseWithErrorInfo {
+	readonly command: 'setGlobalSetting';
+	readonly setting: string;
+}
+
 export type RequestMessage =
 	RequestAddRemote
 	| RequestAddTag
@@ -1577,6 +1596,7 @@ export type RequestMessage =
 	| RequestViewFileAtRevision
 	| RequestViewScm
 	| RequestFetchPullRequest
+	| RequestSetGlobalSetting
 	| RequestSetInterfaceLanguage;
 
 export type ResponseMessage =
@@ -1653,6 +1673,7 @@ export type ResponseMessage =
 	| ResponseViewFileAtRevision
 	| ResponseViewScm
 	| ResponsePullRequestStatus
+	| ResponseSetGlobalSetting
 	| ResponseSetInterfaceLanguage;
 
 

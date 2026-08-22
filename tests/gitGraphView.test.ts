@@ -524,6 +524,152 @@ describe('GitGraphView', () => {
 			});
 		});
 
+		describe('setGlobalSetting', () => {
+			it('Should save a boolean Global Setting', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'pullRequests.enabled',
+					value: true
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).toHaveBeenCalledWith('pullRequests.enabled', true, 1 /* ConfigurationTarget.Global */);
+					expect(messages).toStrictEqual([
+						{
+							command: 'setGlobalSetting',
+							setting: 'pullRequests.enabled',
+							error: null
+						}
+					]);
+				});
+			});
+
+			it('Should save a numeric Global Setting that is within the allowed range', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'graph.rowHeight',
+					value: 32
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).toHaveBeenCalledWith('graph.rowHeight', 32, 1 /* ConfigurationTarget.Global */);
+					expect((<any>messages[0]).error).toBe(null);
+				});
+			});
+
+			it('Should reject a setting that isn\'t a writable Global Setting', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'integratedTerminalShell',
+					value: '/bin/sh'
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).not.toHaveBeenCalled();
+					expect(messages).toStrictEqual([
+						{
+							command: 'setGlobalSetting',
+							setting: 'integratedTerminalShell',
+							error: 'The setting "integratedTerminalShell" cannot be changed from the Settings page.'
+						}
+					]);
+				});
+			});
+
+			it('Should reject a setting inherited from Object.prototype', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'constructor',
+					value: true
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).not.toHaveBeenCalled();
+					expect((<any>messages[0]).error).toBe('The setting "constructor" cannot be changed from the Settings page.');
+				});
+			});
+
+			it('Should reject a value of the wrong type', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'pullRequests.enabled',
+					value: <any>'true'
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).not.toHaveBeenCalled();
+					expect((<any>messages[0]).error).toBe('The value provided for the setting "pullRequests.enabled" is invalid.');
+				});
+			});
+
+			it('Should reject a numeric value outside the allowed range', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'graph.rowHeight',
+					value: 999
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).not.toHaveBeenCalled();
+					expect((<any>messages[0]).error).toBe('The value provided for the setting "graph.rowHeight" is invalid.');
+				});
+			});
+
+			it('Should reject a value that isn\'t one of the allowed enum values', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'graph.style',
+					value: 'squiggly'
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).not.toHaveBeenCalled();
+					expect((<any>messages[0]).error).toBe('The value provided for the setting "graph.style" is invalid.');
+				});
+			});
+
+			it('Should save the Gerrit status filter, and reject a malformed one', async () => {
+				// Run
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'gerrit.statusFilter',
+					value: { new: true, merged: true, abandoned: false, wip: false }
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(vscode.mocks.workspaceConfiguration.update).toHaveBeenCalledWith('gerrit.statusFilter', { new: true, merged: true, abandoned: false, wip: false }, 1 /* ConfigurationTarget.Global */);
+				});
+
+				// Run
+				messages.length = 0;
+				onDidReceiveMessage({
+					command: 'setGlobalSetting',
+					setting: 'gerrit.statusFilter',
+					value: <any>{ new: true }
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect((<any>messages[0]).error).toBe('The value provided for the setting "gerrit.statusFilter" is invalid.');
+				});
+			});
+		});
+
 		describe('addTag', () => {
 			it('Should add a tag', async () => {
 				// Setup
@@ -4375,7 +4521,7 @@ describe('GitGraphView', () => {
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src vscode-webview-resource: \'unsafe-inline\'; script-src \'nonce-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d\'; img-src data: https:;">');
-			expect(mockedWebviewPanel.panel.webview.html).toContain('<link rel="stylesheet" type="text/css" href="vscode-webview-resource://file///path/to/extension/media/out.min.css?v=1.39.0">');
+			expect(mockedWebviewPanel.panel.webview.html).toContain('<link rel="stylesheet" type="text/css" href="vscode-webview-resource://file///path/to/extension/media/out.min.css?v=1.39.1">');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<title>Git Graph</title>');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<style>body{--git-graph-color0:#0085d9; --git-graph-color1:#d9008f; --git-graph-color2:#00d90a; --git-graph-color3:#d98500; --git-graph-color4:#a300d9; --git-graph-color5:#ff0000; --git-graph-color6:#00d9cc; --git-graph-color7:#e138e8; --git-graph-color8:#85d900; --git-graph-color9:#dc5b23; --git-graph-color10:#6f24d6; --git-graph-color11:#ffcc00; } [data-color=\"0\"]{--git-graph-color:var(--git-graph-color0);} [data-color=\"1\"]{--git-graph-color:var(--git-graph-color1);} [data-color=\"2\"]{--git-graph-color:var(--git-graph-color2);} [data-color=\"3\"]{--git-graph-color:var(--git-graph-color3);} [data-color=\"4\"]{--git-graph-color:var(--git-graph-color4);} [data-color=\"5\"]{--git-graph-color:var(--git-graph-color5);} [data-color=\"6\"]{--git-graph-color:var(--git-graph-color6);} [data-color=\"7\"]{--git-graph-color:var(--git-graph-color7);} [data-color=\"8\"]{--git-graph-color:var(--git-graph-color8);} [data-color=\"9\"]{--git-graph-color:var(--git-graph-color9);} [data-color=\"10\"]{--git-graph-color:var(--git-graph-color10);} [data-color=\"11\"]{--git-graph-color:var(--git-graph-color11);} </style>');
 		});
@@ -4419,7 +4565,7 @@ describe('GitGraphView', () => {
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<div id="view" tabindex="-1">');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d">');
-			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d" src="vscode-webview-resource://file///path/to/extension/media/out.min.js?v=1.39.0"></script>');
+			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d" src="vscode-webview-resource://file///path/to/extension/media/out.min.js?v=1.39.1"></script>');
 			expect(spyOnIsAvatarStorageAvailable).not.toHaveBeenCalled();
 		});
 
@@ -4435,7 +4581,7 @@ describe('GitGraphView', () => {
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<div id="view" tabindex="-1">');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d">');
-			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d" src="vscode-webview-resource://file///path/to/extension/media/out.min.js?v=1.39.0"></script>');
+			expect(mockedWebviewPanel.panel.webview.html).toContain('<script nonce="1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d" src="vscode-webview-resource://file///path/to/extension/media/out.min.js?v=1.39.1"></script>');
 			expect(spyOnIsAvatarStorageAvailable).toHaveBeenCalledWith();
 		});
 	});

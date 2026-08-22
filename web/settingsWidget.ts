@@ -1,6 +1,8 @@
 interface SettingsWidgetState {
 	readonly currentRepo: string | null;
 	readonly scrollTop: number;
+	readonly repoColumnScrollTop: number;
+	readonly globalColumnScrollTop: number;
 }
 
 /**
@@ -13,6 +15,8 @@ class SettingsWidget {
 	private config: Readonly<GG.GitRepoConfig> | null = null;
 	private loading: boolean = false;
 	private scrollTop: number = 0;
+	private repoColumnScrollTop: number = 0;
+	private globalColumnScrollTop: number = 0;
 
 	private readonly widgetElem: HTMLElement;
 	private readonly contentsElem: HTMLElement;
@@ -52,11 +56,15 @@ class SettingsWidget {
 	 * @param currentRepo The repository that is currently loaded in the view.
 	 * @param isInitialLoad Is this the initial load of the Setting Widget, or is it being shown when restoring a previous state.
 	 * @param scrollTop The scrollTop the Settings Widget should initially be set to.
+	 * @param repoColumnScrollTop The scrollTop the Repository Settings column should initially be set to.
+	 * @param globalColumnScrollTop The scrollTop the Global Settings column should initially be set to.
 	 */
-	public show(currentRepo: string, isInitialLoad: boolean = true, scrollTop: number = 0) {
+	public show(currentRepo: string, isInitialLoad: boolean = true, scrollTop: number = 0, repoColumnScrollTop: number = 0, globalColumnScrollTop: number = 0) {
 		if (this.currentRepo !== null) return;
 		this.currentRepo = currentRepo;
 		this.scrollTop = scrollTop;
+		this.repoColumnScrollTop = repoColumnScrollTop;
+		this.globalColumnScrollTop = globalColumnScrollTop;
 		alterClass(this.widgetElem, CLASS_TRANSITION, isInitialLoad);
 		this.widgetElem.classList.add(CLASS_ACTIVE);
 		this.view.saveState();
@@ -103,7 +111,9 @@ class SettingsWidget {
 	public getState(): SettingsWidgetState {
 		return {
 			currentRepo: this.currentRepo,
-			scrollTop: this.scrollTop
+			scrollTop: this.scrollTop,
+			repoColumnScrollTop: this.repoColumnScrollTop,
+			globalColumnScrollTop: this.globalColumnScrollTop
 		};
 	}
 
@@ -113,7 +123,7 @@ class SettingsWidget {
 	 */
 	public restoreState(state: SettingsWidgetState) {
 		if (state.currentRepo === null) return;
-		this.show(state.currentRepo, false, state.scrollTop);
+		this.show(state.currentRepo, false, state.scrollTop, state.repoColumnScrollTop || 0, state.globalColumnScrollTop || 0);
 	}
 
 	/**
@@ -150,11 +160,10 @@ class SettingsWidget {
 				? escapeHtml(formatCommaSeparatedList(initialBranches))
 				: strings.settingsShowAll;
 
-			let html = '<div class="settingsSection general"><h3>' + strings.settingsSectionGeneral + '</h3>' +
+			let repoHtml = '<div class="settingsSection general"><h3>' + strings.settingsSectionGeneral + '</h3>' +
 				'<table>' +
 				'<tr class="lineAbove"><td class="left">' + strings.settingsNameLabel + '</td><td class="leftWithEllipsis" title="' + escapedRepoName + (this.repo.name === null ? strings.settingsNameDefault : '') + '">' + escapedRepoName + '</td><td class="btns right"><div id="editRepoName" title="' + strings.settingsEditNameTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div>' + (this.repo.name !== null ? ' <div id="deleteRepoName" title="' + strings.settingsDeleteNameTitle + ELLIPSIS + '">' + SVG_ICONS.close + '</div>' : '') + '</td></tr>' +
-				'<tr><td class="left">' + strings.settingsInitialBranchesLabel + '</td><td class="leftWithEllipsis" title="' + initialBranchesStr + ' (' + (initialBranchesLocallyConfigured ? strings.settingsLocal : strings.settingsGlobal) + ')">' + initialBranchesStr + '</td><td class="btns right"><div id="editInitialBranches" title="' + strings.settingsEditInitialBranchesTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div>' + (initialBranchesLocallyConfigured ? ' <div id="clearInitialBranches" title="' + strings.settingsClearInitialBranchesTitle + ELLIPSIS + '">' + SVG_ICONS.close + '</div>' : '') + '</td></tr>' +
-				'<tr class="lineAbove lineBelow"><td class="left">' + strings.settingsInterfaceLanguageLabel + '</td><td class="left"><select id="settingsInterfaceLanguage" tabindex="-1"><option value="en">' + strings.settingsLanguageEnglish + '</option><option value="zh-cn">' + strings.settingsLanguageChinese + '</option></select></td><td class="btns right"></td></tr>' +
+				'<tr class="lineBelow"><td class="left">' + strings.settingsInitialBranchesLabel + '</td><td class="leftWithEllipsis" title="' + initialBranchesStr + ' (' + (initialBranchesLocallyConfigured ? strings.settingsLocal : strings.settingsGlobal) + ')">' + initialBranchesStr + '</td><td class="btns right"><div id="editInitialBranches" title="' + strings.settingsEditInitialBranchesTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div>' + (initialBranchesLocallyConfigured ? ' <div id="clearInitialBranches" title="' + strings.settingsClearInitialBranchesTitle + ELLIPSIS + '">' + SVG_ICONS.close + '</div>' : '') + '</td></tr>' +
 				'</table>' +
 				'<label id="settingsShowStashes"><input type="checkbox" id="settingsShowStashesCheckbox" tabindex="-1"><span class="customCheckbox"></span>' + strings.settingsShowStashes + '</label><br/>' +
 				'<label id="settingsShowTags"><input type="checkbox" id="settingsShowTagsCheckbox" tabindex="-1"><span class="customCheckbox"></span>' + strings.settingsShowTags + '</label><br/>' +
@@ -164,68 +173,56 @@ class SettingsWidget {
 
 			let userNameSet = false, userEmailSet = false;
 			if (this.config !== null) {
-				html += '<div class="settingsSection centered"><h3>' + strings.settingsSectionUserDetails + '</h3>';
+				repoHtml += '<div class="settingsSection centered"><h3>' + strings.settingsSectionUserDetails + '</h3>';
 				const userName = this.config.user.name, userEmail = this.config.user.email;
 				userNameSet = userName.local !== null || userName.global !== null;
 				userEmailSet = userEmail.local !== null || userEmail.global !== null;
 				if (userNameSet || userEmailSet) {
 					const escapedUserName = escapeHtml(userName.local ?? userName.global ?? strings.settingsNotSet);
 					const escapedUserEmail = escapeHtml(userEmail.local ?? userEmail.global ?? strings.settingsNotSet);
-					html += '<table>' +
+					repoHtml += '<table>' +
 						'<tr><td class="left">' + strings.settingsUserNameLabel + '</td><td class="leftWithEllipsis" title="' + escapedUserName + (userNameSet ? ' (' + (userName.local !== null ? strings.settingsLocal : strings.settingsGlobal) + ')' : '') + '">' + escapedUserName + '</td></tr>' +
 						'<tr><td class="left">' + strings.settingsUserEmailLabel + '</td><td class="leftWithEllipsis" title="' + escapedUserEmail + (userEmailSet ? ' (' + (userEmail.local !== null ? strings.settingsLocal : strings.settingsGlobal) + ')' : '') + '">' + escapedUserEmail + '</td></tr>' +
 						'</table>' +
 						'<div class="settingsSectionButtons"><div id="editUserDetails" class="editBtn">' + SVG_ICONS.pencil + strings.settingsEdit + '</div><div id="removeUserDetails" class="removeBtn">' + SVG_ICONS.close + strings.settingsRemove + '</div></div>';
 				} else {
-					html += '<span>' + strings.settingsUserDetailsIntro + '</span>' +
+					repoHtml += '<span>' + strings.settingsUserDetailsIntro + '</span>' +
 						'<div class="settingsSectionButtons"><div id="editUserDetails" class="addBtn">' + SVG_ICONS.plus + strings.settingsAddUserDetails + '</div></div>';
 				}
-				html += '</div>';
+				repoHtml += '</div>';
 
-				html += '<div class="settingsSection"><h3>' + strings.settingsSectionRemotes + '</h3><table><tr><th>' + strings.settingsRemote + '</th><th>' + strings.settingsUrl + '</th><th>' + strings.settingsType + '</th><th>' + strings.settingsAction + '</th></tr>';
+				repoHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionRemotes + '</h3><table><tr><th>' + strings.settingsRemote + '</th><th>' + strings.settingsUrl + '</th><th>' + strings.settingsType + '</th><th>' + strings.settingsAction + '</th></tr>';
 				if (this.config.remotes.length > 0) {
 					const hideRemotes = this.repo.hideRemotes;
 					this.config.remotes.forEach((remote, i) => {
 						const hidden = hideRemotes.includes(remote.name);
 						const fetchUrl = escapeHtml(remote.url || strings.settingsNotSet), pushUrl = escapeHtml(remote.pushUrl || remote.url || strings.settingsNotSet);
-						html += '<tr class="lineAbove">' +
+						repoHtml += '<tr class="lineAbove">' +
 							'<td class="left" rowspan="2"><span class="hideRemoteBtn" data-index="' + i + '" title="' + (hidden ? strings.settingsHideRemoteTitle : strings.settingsShowRemoteTitle) + '">' + (hidden ? SVG_ICONS.eyeClosed : SVG_ICONS.eyeOpen) + '</span>' + escapeHtml(remote.name) + '</td>' +
 							'<td class="leftWithEllipsis" title="' + strings.settingsFetchUrlInput + ': ' + fetchUrl + '">' + fetchUrl + '</td><td>' + strings.settingsFetch + '</td>' +
 							'<td class="btns remoteBtns" rowspan="2" data-index="' + i + '"><div class="fetchRemote" title="' + strings.settingsFetchFromRemoteTitle + ELLIPSIS + '">' + SVG_ICONS.download + '</div> <div class="pruneRemote" title="' + strings.settingsPruneRemoteTitle + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="editRemote" title="' + strings.settingsEditRemoteTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div> <div class="deleteRemote" title="' + strings.settingsDeleteRemoteTitle + ELLIPSIS + '">' + SVG_ICONS.close + '</div></td>' +
 							'</tr><tr><td class="leftWithEllipsis" title="' + strings.settingsPushUrlInput + ': ' + pushUrl + '">' + pushUrl + '</td><td>' + strings.settingsPush + '</td></tr>';
 					});
 				} else {
-					html += '<tr class="lineAbove"><td colspan="4">' + strings.settingsNoRemotes + '</td></tr>';
+					repoHtml += '<tr class="lineAbove"><td colspan="4">' + strings.settingsNoRemotes + '</td></tr>';
 				}
-				html += '</table><div class="settingsSectionButtons lineAbove"><div id="settingsAddRemote" class="addBtn">' + SVG_ICONS.plus + strings.settingsAddRemote + '</div></div></div>';
+				repoHtml += '</table><div class="settingsSectionButtons lineAbove"><div id="settingsAddRemote" class="addBtn">' + SVG_ICONS.plus + strings.settingsAddRemote + '</div></div></div>';
 			}
 
-			const gerritConfig = this.view.getGerritConfig();
-			if (gerritConfig.enabled) {
-				const gerritCacheValue = gerritConfig.fetchMode === 'all'
-					? strings.settingsAllOpenChanges
-					: formatStr(strings.settingsLatestChanges, String(gerritConfig.fetchLimit));
-				const gerritCacheStr = escapeHtml(gerritCacheValue + ' (' + strings.settingsGlobal + ')');
-				html += '<div class="settingsSection"><h3>' + strings.settingsSectionGerrit + '</h3><table>' +
-					'<tr class="lineAbove"><td class="left">' + strings.settingsShowGerritBarLabel + '</td><td class="left"><label id="settingsShowGerritBar"><input type="checkbox" id="settingsShowGerritBarCheckbox" tabindex="-1"' + (gerritConfig.showControlsBar ? ' checked' : '') + '><span class="customCheckbox"></span>' + strings.settingsShowGerritBarCheckbox + '</label></td><td class="btns right"></td></tr>' +
-					'<tr class="lineAbove"><td class="left">' + strings.settingsChangeRefsCacheLabel + '</td><td class="leftWithEllipsis" title="' + gerritCacheStr + '">' + gerritCacheStr + '</td><td class="btns right"><div id="editGerritFetchConfig" title="' + strings.settingsEditChangeRefsCacheTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div></td></tr>' +
-					'</table></div>';
-			}
-
-			html += '<div class="settingsSection centered"><h3>' + strings.settingsSectionIssueLinking + '</h3>';
+			repoHtml += '<div class="settingsSection centered"><h3>' + strings.settingsSectionIssueLinking + '</h3>';
 			const issueLinkingConfig = this.repo.issueLinkingConfig || globalState.issueLinkingConfig;
 			if (issueLinkingConfig !== null) {
 				const escapedIssue = escapeHtml(issueLinkingConfig.issue), escapedUrl = escapeHtml(issueLinkingConfig.url);
-				html += '<table><tr><td class="left">' + strings.settingsIssueRegexLabel + '</td><td class="leftWithEllipsis" title="' + escapedIssue + '">' + escapedIssue + '</td></tr><tr><td class="left">' + strings.settingsIssueUrlLabel + '</td><td class="leftWithEllipsis" title="' + escapedUrl + '">' + escapedUrl + '</td></tr></table>' +
+				repoHtml += '<table><tr><td class="left">' + strings.settingsIssueRegexLabel + '</td><td class="leftWithEllipsis" title="' + escapedIssue + '">' + escapedIssue + '</td></tr><tr><td class="left">' + strings.settingsIssueUrlLabel + '</td><td class="leftWithEllipsis" title="' + escapedUrl + '">' + escapedUrl + '</td></tr></table>' +
 					'<div class="settingsSectionButtons"><div id="editIssueLinking" class="editBtn">' + SVG_ICONS.pencil + strings.settingsEdit + '</div><div id="removeIssueLinking" class="removeBtn">' + SVG_ICONS.close + strings.settingsRemove + '</div></div>';
 			} else {
-				html += '<span>' + strings.settingsIssueLinkingIntro + '</span>' +
+				repoHtml += '<span>' + strings.settingsIssueLinkingIntro + '</span>' +
 					'<div class="settingsSectionButtons"><div id="editIssueLinking" class="addBtn">' + SVG_ICONS.plus + strings.settingsAddIssueLinking + '</div></div>';
 			}
-			html += '</div>';
+			repoHtml += '</div>';
 
 			if (this.config !== null) {
-				html += '<div class="settingsSection centered"><h3>' + strings.settingsSectionPullRequest + '</h3>';
+				repoHtml += '<div class="settingsSection centered"><h3>' + strings.settingsSectionPullRequest + '</h3>';
 				const pullRequestConfig = this.repo.pullRequestConfig;
 				if (pullRequestConfig !== null) {
 					const provider = escapeHtml((pullRequestConfig.provider === GG.PullRequestProvider.Bitbucket
@@ -239,24 +236,154 @@ class SettingsWidget {
 					const source = escapeHtml(pullRequestConfig.sourceOwner + '/' + pullRequestConfig.sourceRepo + ' (' + pullRequestConfig.sourceRemote + ')');
 					const destination = escapeHtml(pullRequestConfig.destOwner + '/' + pullRequestConfig.destRepo + (pullRequestConfig.destRemote !== null ? ' (' + pullRequestConfig.destRemote + ')' : ''));
 					const destinationBranch = escapeHtml(pullRequestConfig.destBranch);
-					html += '<table><tr><td class="left">' + strings.settingsProviderLabel + '</td><td class="leftWithEllipsis" title="' + provider + '">' + provider + '</td></tr>' +
+					repoHtml += '<table><tr><td class="left">' + strings.settingsProviderLabel + '</td><td class="leftWithEllipsis" title="' + provider + '">' + provider + '</td></tr>' +
 						'<tr><td class="left">' + strings.settingsSourceRepoLabel + '</td><td class="leftWithEllipsis" title="' + source + '">' + source + '</td></tr>' +
 						'<tr><td class="left">' + strings.settingsDestinationRepoLabel + '</td><td class="leftWithEllipsis" title="' + destination + '">' + destination + '</td></tr>' +
 						'<tr><td class="left">' + strings.settingsDestinationBranchLabel + '</td><td class="leftWithEllipsis" title="' + destinationBranch + '">' + destinationBranch + '</td></tr></table>' +
 						'<div class="settingsSectionButtons"><div id="editPullRequestIntegration" class="editBtn">' + SVG_ICONS.pencil + strings.settingsEdit + '</div><div id="removePullRequestIntegration" class="removeBtn">' + SVG_ICONS.close + strings.settingsRemove + '</div></div>';
 				} else {
-					html += '<span>' + strings.settingsPrIntro + '</span>' +
+					repoHtml += '<span>' + strings.settingsPrIntro + '</span>' +
 						'<div class="settingsSectionButtons"><div id="editPullRequestIntegration" class="addBtn">' + SVG_ICONS.plus + strings.settingsConfigurePrIntegration + '</div></div>';
 				}
-				html += '</div>';
+				repoHtml += '</div>';
 			}
 
-			html += '<div class="settingsSection"><h3>' + strings.settingsSectionConfig + '</h3><div class="settingsSectionButtons">' +
-				'<div id="openExtensionSettings">' + SVG_ICONS.gear + strings.settingsOpenExtensionSettings + '</div><br/>' +
+			repoHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionConfig + '</h3><div class="settingsSectionButtons">' +
 				'<div id="exportRepositoryConfig">' + SVG_ICONS.package + strings.settingsExportRepoConfig + '</div>' +
 				'</div></div>';
 
-			this.contentsElem.innerHTML = html;
+
+			/* Global Settings Column */
+
+			const viewConfig = this.view.config;
+			const gerritConfig = this.view.getGerritConfig();
+
+			let globalHtml = '<div class="settingsSection"><h3>' + strings.settingsSectionGraphDisplay + '</h3><table>' +
+				SettingsWidget.selectRow('settingsInterfaceLanguage', strings.settingsInterfaceLanguageLabel, [
+					{ name: strings.settingsLanguageEnglish, value: 'en' },
+					{ name: strings.settingsLanguageChinese, value: 'zh-cn' }
+				], viewConfig.interfaceLanguage) +
+				SettingsWidget.selectRow('settingsGraphStyle', strings.settingsGraphStyleLabel, [
+					{ name: strings.settingsGraphStyleRounded, value: 'rounded' },
+					{ name: strings.settingsGraphStyleAngular, value: 'angular' }
+				], viewConfig.graph.style === GG.GraphStyle.Angular ? 'angular' : 'rounded') +
+				SettingsWidget.numberRow('settingsGraphRowHeight', strings.settingsGraphRowHeightLabel, viewConfig.graph.rowHeight, 16, 48, null) +
+				SettingsWidget.numberRow('settingsGraphFontSize', strings.settingsGraphFontSizeLabel, viewConfig.graph.fontSize, 8, 24, null) +
+				SettingsWidget.selectRow('settingsDateType', strings.settingsDateTypeLabel, [
+					{ name: strings.settingsDateTypeAuthor, value: 'Author Date' },
+					{ name: strings.settingsDateTypeCommit, value: 'Commit Date' }
+				], viewConfig.dateType === GG.DateType.Commit ? 'Commit Date' : 'Author Date') +
+				SettingsWidget.selectRow('settingsDateFormat', strings.settingsDateFormatLabel, [
+					{ name: strings.settingsDateFormatDateAndTime, value: 'Date & Time' },
+					{ name: strings.settingsDateFormatDateOnly, value: 'Date Only' },
+					{ name: strings.settingsDateFormatIsoDateAndTime, value: 'ISO Date & Time' },
+					{ name: strings.settingsDateFormatIsoDateOnly, value: 'ISO Date Only' },
+					{ name: strings.settingsDateFormatRelative, value: 'Relative' }
+				], SettingsWidget.dateFormatSettingValue(viewConfig.dateFormat)) +
+				'</table>' +
+				SettingsWidget.checkbox('settingsCombineBranchLabels', strings.settingsCombineBranchLabels, viewConfig.referenceLabels.combineLocalAndRemoteBranchLabels, null) +
+				SettingsWidget.checkbox('settingsStickyHeader', strings.settingsStickyHeader, viewConfig.stickyHeader, null) +
+				SettingsWidget.checkbox('settingsRenderMarkdown', strings.settingsRenderMarkdown, viewConfig.markdown, null) +
+				'</div>';
+
+			globalHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionCommitLoading + '</h3><table>' +
+				SettingsWidget.numberRow('settingsInitialLoad', strings.settingsInitialLoadLabel, viewConfig.initialLoadCommits, 1, 100000, strings.settingsCommitsUnit) +
+				SettingsWidget.numberRow('settingsLoadMore', strings.settingsLoadMoreLabel, viewConfig.loadMoreCommits, 1, 100000, strings.settingsCommitsUnit) +
+				SettingsWidget.selectRow('settingsCommitOrder', strings.settingsCommitOrderLabel, [
+					{ name: strings.settingsCommitOrderDate, value: 'date' },
+					{ name: strings.settingsCommitOrderAuthorDate, value: 'author-date' },
+					{ name: strings.settingsCommitOrderTopo, value: 'topo' }
+				], viewConfig.commitOrdering) +
+				'</table>' +
+				SettingsWidget.checkbox('settingsLoadMoreAutomatically', strings.settingsLoadMoreAutomatically, viewConfig.loadMoreCommitsAutomatically, null) +
+				SettingsWidget.checkbox('settingsFetchAvatars', strings.settingsFetchAvatars, viewConfig.fetchAvatars, null) +
+				SettingsWidget.checkbox('settingsShowUncommittedChanges', strings.settingsShowUncommittedChanges, viewConfig.showUncommittedChanges, null) +
+				SettingsWidget.checkbox('settingsShowUntrackedFiles', strings.settingsShowUntrackedFiles, viewConfig.showUntrackedFiles, null) +
+				'</div>';
+
+			globalHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionRemotesFetching + '</h3>' +
+				SettingsWidget.checkbox('settingsFetchAndPrune', strings.settingsFetchAndPrune, viewConfig.fetchAndPrune, null) +
+				SettingsWidget.checkbox('settingsFetchAndPruneTags', strings.settingsFetchAndPruneTags, viewConfig.fetchAndPruneTags, strings.settingsFetchAndPruneTagsInfo) +
+				SettingsWidget.checkbox('settingsTrackRemoteTags', strings.settingsTrackRemoteTags, viewConfig.trackRemoteTags, null) +
+				SettingsWidget.checkbox('settingsShowRemoteBranchesGlobal', strings.settingsShowRemoteBranchesGlobal, viewConfig.showRemoteBranches, null) +
+				SettingsWidget.checkbox('settingsShowRemoteHeads', strings.settingsShowRemoteHeads, viewConfig.showRemoteHeads, null) +
+				'</div>';
+
+			globalHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionGerrit + '</h3>' +
+				SettingsWidget.checkbox('settingsGerritEnabled', strings.settingsGerritEnabled, gerritConfig.enabled, null);
+			if (gerritConfig.enabled) {
+				const gerritCacheValue = gerritConfig.fetchMode === 'all'
+					? strings.settingsAllOpenChanges
+					: formatStr(strings.settingsLatestChanges, String(gerritConfig.fetchLimit));
+				const gerritCacheStr = escapeHtml(gerritCacheValue + ' (' + strings.settingsGlobal + ')');
+				globalHtml += '<table>' +
+					'<tr class="lineAbove"><td class="left">' + strings.settingsShowGerritBarLabel + '</td><td class="left"><label id="settingsShowGerritBar"><input type="checkbox" id="settingsShowGerritBarCheckbox" tabindex="-1"' + (gerritConfig.showControlsBar ? ' checked' : '') + '><span class="customCheckbox"></span>' + strings.settingsShowGerritBarCheckbox + '</label></td><td class="btns right"></td></tr>' +
+					'<tr class="lineAbove"><td class="left">' + strings.settingsChangeRefsCacheLabel + '</td><td class="leftWithEllipsis" title="' + gerritCacheStr + '">' + gerritCacheStr + '</td><td class="btns right"><div id="editGerritFetchConfig" title="' + strings.settingsEditChangeRefsCacheTitle + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div></td></tr>' +
+					'</table>' +
+					SettingsWidget.checkbox('settingsGerritAutoFetch', strings.settingsGerritAutoFetch, gerritConfig.autoFetch, null) +
+					SettingsWidget.checkbox('settingsGerritShowReviewProgress', strings.settingsGerritShowReviewProgress, gerritConfig.showReviewProgress, null) +
+					SettingsWidget.checkbox('settingsGerritShowChangeRefs', strings.settingsGerritShowChangeRefs, gerritConfig.showChangeRefs, null) +
+					SettingsWidget.checkbox('settingsGerritShowPushButton', strings.settingsGerritShowPushButton, gerritConfig.showPushButton, null) +
+					'<div class="settingsSubLabel">' + strings.settingsGerritStatusFilterLabel + '</div>' +
+					SettingsWidget.checkbox('settingsGerritStatusNew', strings.settingsGerritStatusNew, gerritConfig.statusFilter.new, null) +
+					SettingsWidget.checkbox('settingsGerritStatusMerged', strings.settingsGerritStatusMerged, gerritConfig.statusFilter.merged, null) +
+					SettingsWidget.checkbox('settingsGerritStatusAbandoned', strings.settingsGerritStatusAbandoned, gerritConfig.statusFilter.abandoned, null) +
+					SettingsWidget.checkbox('settingsGerritStatusWip', strings.settingsGerritStatusWip, gerritConfig.statusFilter.wip, null);
+			}
+			globalHtml += '</div>';
+
+			globalHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionReviewIntegration + '</h3>' +
+				SettingsWidget.checkbox('settingsPullRequestsEnabled', strings.settingsPullRequestsEnabled, viewConfig.pullRequests.enabled, strings.settingsPullRequestsEnabledInfo) +
+				'</div>';
+
+			globalHtml += '<div class="settingsSection"><h3>' + strings.settingsSectionConfig + '</h3><div class="settingsSectionButtons">' +
+				'<div id="openExtensionSettings">' + SVG_ICONS.gear + strings.settingsOpenExtensionSettings + '</div>' +
+				'</div></div>';
+
+			this.contentsElem.innerHTML = '<div id="settingsColumns">' +
+				'<div class="settingsColumn" id="settingsRepoColumn"><h3 class="settingsColumnTitle" title="' + strings.settingsColumnRepoHint + '">' + strings.settingsColumnRepo + '</h3>' + repoHtml + '</div>' +
+				'<div class="settingsColumn" id="settingsGlobalColumn"><h3 class="settingsColumnTitle" title="' + strings.settingsColumnGlobalHint + '">' + strings.settingsColumnGlobal + '</h3>' + globalHtml + '</div>' +
+				'</div>';
+
+			observeElemScroll('settingsRepoColumn', this.repoColumnScrollTop, (scrollTop) => {
+				this.repoColumnScrollTop = scrollTop;
+			}, () => this.view.saveState());
+			observeElemScroll('settingsGlobalColumn', this.globalColumnScrollTop, (scrollTop) => {
+				this.globalColumnScrollTop = scrollTop;
+			}, () => this.view.saveState());
+
+			this.wireGlobalSelect('settingsGraphStyle', 'graph.style');
+			this.wireGlobalNumber('settingsGraphRowHeight', 'graph.rowHeight', 16, 48, viewConfig.graph.rowHeight);
+			this.wireGlobalNumber('settingsGraphFontSize', 'graph.fontSize', 8, 24, viewConfig.graph.fontSize);
+			this.wireGlobalSelect('settingsDateType', 'date.type');
+			this.wireGlobalSelect('settingsDateFormat', 'date.format');
+			this.wireGlobalCheckbox('settingsCombineBranchLabels', 'referenceLabels.combineLocalAndRemoteBranchLabels');
+			this.wireGlobalCheckbox('settingsStickyHeader', 'stickyHeader');
+			this.wireGlobalCheckbox('settingsRenderMarkdown', 'markdown');
+
+			this.wireGlobalNumber('settingsInitialLoad', 'repository.commits.initialLoad', 1, 100000, viewConfig.initialLoadCommits);
+			this.wireGlobalNumber('settingsLoadMore', 'repository.commits.loadMore', 1, 100000, viewConfig.loadMoreCommits);
+			this.wireGlobalSelect('settingsCommitOrder', 'repository.commits.order');
+			this.wireGlobalCheckbox('settingsLoadMoreAutomatically', 'repository.commits.loadMoreAutomatically');
+			this.wireGlobalCheckbox('settingsFetchAvatars', 'repository.commits.fetchAvatars');
+			this.wireGlobalCheckbox('settingsShowUncommittedChanges', 'repository.showUncommittedChanges');
+			this.wireGlobalCheckbox('settingsShowUntrackedFiles', 'repository.showUntrackedFiles');
+
+			this.wireGlobalCheckbox('settingsFetchAndPrune', 'repository.fetchAndPrune');
+			this.wireGlobalCheckbox('settingsFetchAndPruneTags', 'repository.fetchAndPruneTags');
+			this.wireGlobalCheckbox('settingsTrackRemoteTags', 'repository.trackRemoteTags');
+			this.wireGlobalCheckbox('settingsShowRemoteBranchesGlobal', 'repository.showRemoteBranches');
+			this.wireGlobalCheckbox('settingsShowRemoteHeads', 'repository.showRemoteHeads');
+
+			this.wireGlobalCheckbox('settingsGerritEnabled', 'gerrit.enabled');
+			this.wireGlobalCheckbox('settingsGerritAutoFetch', 'gerrit.autoFetch');
+			this.wireGlobalCheckbox('settingsGerritShowReviewProgress', 'gerrit.showReviewProgress');
+			this.wireGlobalCheckbox('settingsGerritShowChangeRefs', 'gerrit.showChangeRefs');
+			this.wireGlobalCheckbox('settingsGerritShowPushButton', 'gerrit.showPushButton');
+			this.wireGerritStatusFilter(gerritConfig.statusFilter);
+
+			this.wireGlobalCheckbox('settingsPullRequestsEnabled', 'pullRequests.enabled');
+
 
 			document.getElementById('editRepoName')!.addEventListener('click', () => {
 				if (this.currentRepo === null || this.repo === null) return;
@@ -579,6 +706,146 @@ class SettingsWidget {
 		this.loadingElem.innerHTML = this.loading ? '<span>' + SVG_ICONS.loading + strings.loading + '</span>' : '';
 		this.widgetElem.scrollTop = this.scrollTop;
 		this.loadingElem.style.top = (this.scrollTop + (this.widgetElem.clientHeight / 2) - 12) + 'px';
+	}
+
+
+	/* Global Setting Render Helpers */
+
+	/**
+	 * Render a table row containing a `<select>` bound to a Global Setting.
+	 * @param id The id of the `<select>` element.
+	 * @param label The label displayed in the first column.
+	 * @param options The options of the `<select>`, in the order they are displayed.
+	 * @param value The value of the option that is currently selected.
+	 * @returns The HTML of the row.
+	 */
+	private static selectRow(id: string, label: string, options: ReadonlyArray<{ name: string, value: string }>, value: string) {
+		let html = '<tr class="lineAbove"><td class="left">' + label + '</td><td class="left" colspan="2"><select class="settingsGlobalSelect" id="' + id + '" tabindex="-1">';
+		options.forEach((option) => {
+			html += '<option value="' + escapeHtml(option.value) + '"' + (option.value === value ? ' selected' : '') + '>' + option.name + '</option>';
+		});
+		return html + '</select></td></tr>';
+	}
+
+	/**
+	 * Render a table row containing a numeric `<input>` bound to a Global Setting.
+	 * @param id The id of the `<input>` element.
+	 * @param label The label displayed in the first column.
+	 * @param value The current value of the setting.
+	 * @param min The smallest value the setting accepts.
+	 * @param max The largest value the setting accepts.
+	 * @param unit The unit displayed after the input (NULL => no unit).
+	 * @returns The HTML of the row.
+	 */
+	private static numberRow(id: string, label: string, value: number, min: number, max: number, unit: string | null) {
+		return '<tr class="lineAbove"><td class="left">' + label + '</td><td class="left" colspan="2">' +
+			'<input class="settingsGlobalNumber" type="number" id="' + id + '" tabindex="-1" min="' + min + '" max="' + max + '" value="' + value + '">' +
+			(unit !== null ? '<span class="settingsInputUnit">' + unit + '</span>' : '') +
+			'</td></tr>';
+	}
+
+	/**
+	 * Render a checkbox bound to a Global Setting.
+	 * @param id The id of the label (the `<input>` gets the id with a "Checkbox" suffix).
+	 * @param label The text displayed beside the checkbox.
+	 * @param checked Is the checkbox checked.
+	 * @param info The tooltip of an information icon rendered after the label (NULL => no icon).
+	 * @returns The HTML of the checkbox.
+	 */
+	private static checkbox(id: string, label: string, checked: boolean, info: string | null) {
+		return '<label class="settingsGlobalCheckbox" id="' + id + '"><input type="checkbox" id="' + id + 'Checkbox" tabindex="-1"' + (checked ? ' checked' : '') + '><span class="customCheckbox"></span>' + label + '</label>' +
+			(info !== null ? '<span class="settingsWidgetInfo" title="' + escapeHtml(info) + '">' + SVG_ICONS.info + '</span>' : '') + '<br/>';
+	}
+
+	/**
+	 * Get the value of the `review-graph.date.format` Extension Setting that produces the given
+	 * parsed date format (the webview only receives the parsed form).
+	 * @param dateFormat The parsed date format.
+	 * @returns The value of the Extension Setting.
+	 */
+	private static dateFormatSettingValue(dateFormat: GG.DateFormat) {
+		if (dateFormat.type === GG.DateFormatType.Relative) return 'Relative';
+		return (dateFormat.iso ? 'ISO ' : '') + (dateFormat.type === GG.DateFormatType.DateOnly ? 'Date Only' : 'Date & Time');
+	}
+
+
+	/* Global Setting Wiring Helpers */
+
+	/**
+	 * Save a Global Setting, and display the "Saving Setting" action running state while it is saved.
+	 * @param setting The key of the setting, relative to the `review-graph` section.
+	 * @param value The new value of the setting.
+	 */
+	private saveGlobalSetting(setting: string, value: GG.GlobalSettingValue) {
+		runAction({ command: 'setGlobalSetting', setting: setting, value: value }, strings.settingsSavingSetting);
+	}
+
+	/**
+	 * Wire a checkbox rendered by SettingsWidget.checkbox to the Global Setting it controls.
+	 * @param id The id passed to SettingsWidget.checkbox.
+	 * @param setting The key of the setting, relative to the `review-graph` section.
+	 */
+	private wireGlobalCheckbox(id: string, setting: string) {
+		const elem = <HTMLInputElement | null>document.getElementById(id + 'Checkbox');
+		if (elem === null) return;
+		elem.addEventListener('change', () => this.saveGlobalSetting(setting, elem.checked));
+	}
+
+	/**
+	 * Wire a `<select>` rendered by SettingsWidget.selectRow to the Global Setting it controls.
+	 * @param id The id passed to SettingsWidget.selectRow.
+	 * @param setting The key of the setting, relative to the `review-graph` section.
+	 */
+	private wireGlobalSelect(id: string, setting: string) {
+		const elem = <HTMLSelectElement | null>document.getElementById(id);
+		if (elem === null) return;
+		elem.addEventListener('change', () => this.saveGlobalSetting(setting, elem.value));
+	}
+
+	/**
+	 * Wire a numeric `<input>` rendered by SettingsWidget.numberRow to the Global Setting it controls.
+	 * Values outside [min, max] (and non-numeric input) are rejected, restoring the saved value.
+	 * @param id The id passed to SettingsWidget.numberRow.
+	 * @param setting The key of the setting, relative to the `review-graph` section.
+	 * @param min The smallest value the setting accepts.
+	 * @param max The largest value the setting accepts.
+	 * @param current The currently saved value of the setting.
+	 */
+	private wireGlobalNumber(id: string, setting: string, min: number, max: number, current: number) {
+		const elem = <HTMLInputElement | null>document.getElementById(id);
+		if (elem === null) return;
+		elem.addEventListener('change', () => {
+			const value = parseInt(elem.value, 10);
+			if (isNaN(value) || value < min || value > max) {
+				elem.value = String(current);
+				return;
+			}
+			if (value === current) return;
+			this.saveGlobalSetting(setting, value);
+		});
+	}
+
+	/**
+	 * Wire the four Gerrit change status checkboxes: they share the single `gerrit.statusFilter`
+	 * setting, so each one saves the whole object with its own field replaced.
+	 * @param statusFilter The currently saved status filter.
+	 */
+	private wireGerritStatusFilter(statusFilter: GG.GerritStatusFilter) {
+		const fields: ReadonlyArray<{ id: string, field: keyof GG.GerritStatusFilter }> = [
+			{ id: 'settingsGerritStatusNew', field: 'new' },
+			{ id: 'settingsGerritStatusMerged', field: 'merged' },
+			{ id: 'settingsGerritStatusAbandoned', field: 'abandoned' },
+			{ id: 'settingsGerritStatusWip', field: 'wip' }
+		];
+		fields.forEach((entry) => {
+			const elem = <HTMLInputElement | null>document.getElementById(entry.id + 'Checkbox');
+			if (elem === null) return;
+			elem.addEventListener('change', () => {
+				this.saveGlobalSetting('gerrit.statusFilter', Object.assign({
+					new: statusFilter.new, merged: statusFilter.merged, abandoned: statusFilter.abandoned, wip: statusFilter.wip
+				}, { [entry.field]: elem.checked }));
+			});
+		});
 	}
 
 

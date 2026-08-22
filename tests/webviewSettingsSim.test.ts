@@ -1,7 +1,8 @@
 /**
- * End-to-end webview simulation: the Repository Settings widget must render the
- * "Gerrit Code Review > Change Refs Cache" row, and editing it must open a form
- * that sends a gerritSaveFetchConfig request (cache all changes, or the latest N).
+ * End-to-end webview simulation of the Settings widget: it must render the
+ * "Repository Settings" and "Global Settings" columns, the "Gerrit Code Review >
+ * Change Refs Cache" row (editing it opens a form that sends a gerritSaveFetchConfig
+ * request), and the Global Settings controls (which send setGlobalSetting requests).
  */
 /**
  * @jest-environment jsdom
@@ -26,7 +27,8 @@ function makeState() {
 			commitDetailsView: { autoCenter: true, fileTreeCompactFolders: true, fileViewType: 'File Tree', location: 'Inline' },
 			contextMenuActionsVisibility: {},
 			customBranchGlobPatterns: [], customEmojiShortcodeMappings: [], customPullRequestProviders: [],
-			dateFormat: { type: 'relative', short: true, iso: false, string: '' },
+			dateFormat: { type: 2, iso: false }, // DateFormatType.Relative
+			dateType: 0,
 			defaultColumnVisibility: { date: true, author: true, commit: false, signature: false },
 			dialogDefaults: {}, enhancedAccessibility: false,
 			fetchAndPrune: false, fetchAndPruneTags: false, fetchAvatars: false,
@@ -36,10 +38,14 @@ function makeState() {
 				showMetaCommits: 'collapsed', statusFilter: { new: true, merged: false, abandoned: false, wip: false },
 				showPushButton: true, showControlsBar: true
 			},
-			graph: { colours: ['#0085d9'], style: 'rounded', issueLinking: {}, grid: { x: 10, y: 24, offsetX: 8, offsetY: 8, expandY: 8 } },
-			initialLoadCommits: 500, keybindings: {}, loadMoreCommits: 100, loadMoreCommitsAutomatically: true,
-			markdown: false, mute: { commitsNotAncestorsOfHead: false, mergeCommits: false }, onRepoLoad: { showCheckedOutBranch: null, showSpecificBranches: [] }, referenceLabels: { branchLabelsAlignedToGraph: false, combineLocalAndRemoteBranchLabels: true, tagLabelsOnRight: false },
-			showCommitBodyInline: false, stickyHeader: true, tabIconColourTheme: 'colour'
+			graph: { colours: ['#0085d9'], style: 0, fontSize: 13, rowHeight: 24, issueLinking: {}, grid: { x: 10, y: 24, offsetX: 8, offsetY: 8, expandY: 8 } },
+			initialLoadCommits: 500, interfaceLanguage: 'en', keybindings: {}, loadMoreCommits: 100, loadMoreCommitsAutomatically: true,
+			markdown: false, mute: { commitsNotAncestorsOfHead: false, mergeCommits: false }, onRepoLoad: { showCheckedOutBranch: null, showSpecificBranches: [] },
+			pullRequests: { enabled: false },
+			referenceLabels: { branchLabelsAlignedToGraph: false, combineLocalAndRemoteBranchLabels: true, tagLabelsOnRight: false },
+			showCommitBodyInline: false, showRemoteBranches: true, showRemoteHeads: true,
+			showUncommittedChanges: true, showUntrackedFiles: true,
+			stickyHeader: true, tabIconColourTheme: 'colour', trackRemoteTags: false
 		},
 		lastActiveRepo: REPO,
 		loadViewTo: null,
@@ -118,7 +124,7 @@ function respondToInitialLoads() {
 	} }));
 }
 
-/** Open the Repository Settings widget, and return its HTML. */
+/** Open the Settings widget, and return its HTML. */
 function openSettingsWidget() {
 	document.getElementById('settingsBtn').click();
 	const widget = document.getElementById('settingsWidget');
@@ -173,6 +179,98 @@ describe('Webview Gerrit settings simulation', () => {
 
 		const saveMsg = sentMessages.filter((m) => m.command === 'gerritSaveFetchConfig').pop();
 		expect(saveMsg).toEqual({ command: 'gerritSaveFetchConfig', repo: REPO, fetchMode: 'all', fetchLimit: 50 });
+	});
+
+	test('the settings widget renders separate Repository and Global Settings columns', () => {
+		const html = openSettingsWidget();
+
+		expect(html).toContain('Repository Settings');
+		expect(html).toContain('Global Settings');
+
+		const repoColumn = document.getElementById('settingsRepoColumn');
+		const globalColumn = document.getElementById('settingsGlobalColumn');
+		expect(repoColumn).not.toBeNull();
+		expect(globalColumn).not.toBeNull();
+
+		// Repository-scoped settings belong to the left column, Global Settings to the right one
+		expect(repoColumn.textContent).toContain('General');
+		expect(repoColumn.textContent).toContain('Issue Linking');
+		expect(repoColumn.querySelector('#settingsShowStashesCheckbox')).not.toBeNull();
+		expect(globalColumn.querySelector('#settingsShowStashesCheckbox')).toBeNull();
+
+		expect(globalColumn.textContent).toContain('Graph & Display');
+		expect(globalColumn.textContent).toContain('Commit Loading');
+		expect(globalColumn.textContent).toContain('Remotes & Fetching');
+		expect(globalColumn.textContent).toContain('Review Integration');
+		expect(globalColumn.querySelector('#settingsGraphStyle')).not.toBeNull();
+		expect(repoColumn.querySelector('#settingsGraphStyle')).toBeNull();
+	});
+
+	test('the Global Settings controls are pre-filled with the configured values', () => {
+		openSettingsWidget();
+
+		expect((<any>document.getElementById('settingsGraphStyle')).value).toBe('rounded');
+		expect((<any>document.getElementById('settingsGraphRowHeight')).value).toBe('24');
+		expect((<any>document.getElementById('settingsDateFormat')).value).toBe('Relative');
+		expect((<any>document.getElementById('settingsInitialLoad')).value).toBe('500');
+		expect((<any>document.getElementById('settingsCommitOrder')).value).toBe('date');
+		expect((<any>document.getElementById('settingsStickyHeaderCheckbox')).checked).toBe(true);
+		expect((<any>document.getElementById('settingsPullRequestsEnabledCheckbox')).checked).toBe(false);
+	});
+
+	test('toggling a Global Settings checkbox sends a setGlobalSetting request', () => {
+		openSettingsWidget();
+
+		const checkbox = <any>document.getElementById('settingsPullRequestsEnabledCheckbox');
+		checkbox.checked = true;
+		checkbox.dispatchEvent(new Event('change'));
+
+		expect(sentMessages.filter((m) => m.command === 'setGlobalSetting').pop()).toEqual({
+			command: 'setGlobalSetting', setting: 'pullRequests.enabled', value: true
+		});
+	});
+
+	test('changing a Global Settings dropdown sends a setGlobalSetting request', () => {
+		openSettingsWidget();
+
+		const select = <any>document.getElementById('settingsGraphStyle');
+		select.value = 'angular';
+		select.dispatchEvent(new Event('change'));
+
+		expect(sentMessages.filter((m) => m.command === 'setGlobalSetting').pop()).toEqual({
+			command: 'setGlobalSetting', setting: 'graph.style', value: 'angular'
+		});
+	});
+
+	test('a Global Settings number outside the allowed range is rejected and restored', () => {
+		openSettingsWidget();
+
+		const input = <any>document.getElementById('settingsGraphRowHeight');
+		input.value = '999';
+		input.dispatchEvent(new Event('change'));
+
+		expect(sentMessages.filter((m) => m.command === 'setGlobalSetting')).toHaveLength(0);
+		expect(input.value).toBe('24');
+
+		input.value = '32';
+		input.dispatchEvent(new Event('change'));
+
+		expect(sentMessages.filter((m) => m.command === 'setGlobalSetting').pop()).toEqual({
+			command: 'setGlobalSetting', setting: 'graph.rowHeight', value: 32
+		});
+	});
+
+	test('toggling a Gerrit change status saves the whole status filter', () => {
+		openSettingsWidget();
+
+		const checkbox = <any>document.getElementById('settingsGerritStatusMergedCheckbox');
+		checkbox.checked = true;
+		checkbox.dispatchEvent(new Event('change'));
+
+		expect(sentMessages.filter((m) => m.command === 'setGlobalSetting').pop()).toEqual({
+			command: 'setGlobalSetting', setting: 'gerrit.statusFilter',
+			value: { new: true, merged: true, abandoned: false, wip: false }
+		});
 	});
 
 	test('saving an invalid number in latest mode shows an error and sends nothing', () => {

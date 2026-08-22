@@ -2256,6 +2256,9 @@ window.addEventListener('load', () => {
 			case 'setInterfaceLanguage':
 				finishOrDisplayError(msg.error, strings.settingsUnableToSaveLanguage);
 				break;
+			case 'setGlobalSetting':
+				finishOrDisplayError(msg.error, strings.settingsUnableToSaveSetting);
+				break;
 			case 'merge':
 				refreshOrDisplayError(msg.error, 'Unable to Merge ' + msg.actionOn);
 				break;

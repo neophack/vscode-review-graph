@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
  * Must be bumped whenever web/ sources change, so that already-open webviews
  * don't keep serving a stale cached out.min.js / out.min.css after an update.
  */
-const MEDIA_CACHE_VERSION = '1.39.0';
+const MEDIA_CACHE_VERSION = '1.39.1';
 
 import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
@@ -30,6 +30,66 @@ import { Disposable, toDisposable } from './utils/disposable';
 interface GerritCacheEntry {
 	states: GerritChangeState[];
 	patchsets: Map<number, number[]>;
+}
+
+/**
+ * The Global (User) Settings that the Settings Widget is allowed to write, and the validator of
+ * each value. Requests naming a setting that isn't a key of this record are rejected, so a
+ * compromised webview can't write arbitrary VS Code settings.
+ */
+const WRITABLE_GLOBAL_SETTINGS: { readonly [setting: string]: (value: any) => boolean } = {
+	/* Graph & Display */
+	'graph.style': isOneOf('rounded', 'angular'),
+	'graph.rowHeight': isIntegerInRange(16, 48),
+	'graph.fontSize': isIntegerInRange(8, 24),
+	'date.type': isOneOf('Author Date', 'Commit Date'),
+	'date.format': isOneOf('Date & Time', 'Date Only', 'ISO Date & Time', 'ISO Date Only', 'Relative'),
+	'referenceLabels.combineLocalAndRemoteBranchLabels': isBoolean,
+	'stickyHeader': isBoolean,
+	'markdown': isBoolean,
+
+	/* Commit Loading */
+	'repository.commits.initialLoad': isIntegerInRange(1, 100000),
+	'repository.commits.loadMore': isIntegerInRange(1, 100000),
+	'repository.commits.loadMoreAutomatically': isBoolean,
+	'repository.commits.order': isOneOf('date', 'author-date', 'topo'),
+	'repository.commits.fetchAvatars': isBoolean,
+	'repository.showUncommittedChanges': isBoolean,
+	'repository.showUntrackedFiles': isBoolean,
+
+	/* Remotes & Fetching */
+	'repository.fetchAndPrune': isBoolean,
+	'repository.fetchAndPruneTags': isBoolean,
+	'repository.trackRemoteTags': isBoolean,
+	'repository.showRemoteBranches': isBoolean,
+	'repository.showRemoteHeads': isBoolean,
+
+	/* Review Integration */
+	'gerrit.enabled': isBoolean,
+	'gerrit.autoFetch': isBoolean,
+	'gerrit.showReviewProgress': isBoolean,
+	'gerrit.showChangeRefs': isBoolean,
+	'gerrit.showPushButton': isBoolean,
+	'gerrit.statusFilter': isGerritStatusFilter,
+	'pullRequests.enabled': isBoolean
+};
+
+function isBoolean(value: any) {
+	return typeof value === 'boolean';
+}
+
+function isOneOf(...allowed: string[]) {
+	return (value: any) => typeof value === 'string' && allowed.includes(value);
+}
+
+function isIntegerInRange(min: number, max: number) {
+	return (value: any) => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
+function isGerritStatusFilter(value: any) {
+	return value !== null && typeof value === 'object' && !Array.isArray(value) &&
+		Object.keys(value).length === 4 &&
+		isBoolean(value.new) && isBoolean(value.merged) && isBoolean(value.abandoned) && isBoolean(value.wip);
 }
 
 /**
@@ -590,6 +650,14 @@ export class GitGraphView extends Disposable {
 				});
 				break;
 			}
+			case 'setGlobalSetting': {
+				this.sendMessage({
+					command: 'setGlobalSetting',
+					setting: msg.setting,
+					error: await this.setGlobalSetting(msg.setting, msg.value)
+				});
+				break;
+			}
 			case 'gerritSubmitReview':
 				this.sendMessage({
 					command: 'gerritSubmitReview',
@@ -922,6 +990,7 @@ export class GitGraphView extends Disposable {
 				customEmojiShortcodeMappings: config.customEmojiShortcodeMappings,
 				customPullRequestProviders: config.customPullRequestProviders,
 				dateFormat: config.dateFormat,
+				dateType: config.dateType,
 				defaultColumnVisibility: config.defaultColumnVisibility,
 				stickyHeader: config.stickyHeader,
 				dialogDefaults: config.dialogDefaults,
@@ -948,8 +1017,12 @@ export class GitGraphView extends Disposable {
 				repoDropdownOrder: config.repoDropdownOrder,
 				showCommitBodyInline: config.showCommitBodyInline,
 				showRemoteBranches: config.showRemoteBranches,
+				showRemoteHeads: config.showRemoteHeads,
 				showStashes: config.showStashes,
-				showTags: config.showTags
+				showTags: config.showTags,
+				showUncommittedChanges: config.showUncommittedChanges,
+				showUntrackedFiles: config.showUntrackedFiles,
+				trackRemoteTags: config.trackRemoteTags
 			},
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
 			loadViewTo: this.loadViewTo,
@@ -1073,6 +1146,36 @@ export class GitGraphView extends Disposable {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			this.logger.log('Saving the interface language failed: ' + message);
+			return message;
+		}
+		return null;
+	}
+
+	/**
+	 * Save a Global (User) Setting on behalf of the Settings Widget. Only the settings named by
+	 * WRITABLE_GLOBAL_SETTINGS can be written, and only with a value their validator accepts.
+	 * The onDidChangeConfiguration listener reloads the Git Graph View, which re-renders the webview
+	 * with the new value (the settings page is restored from the persisted webview state).
+	 * @param setting The key of the setting, relative to the `review-graph` section.
+	 * @param value The new value of the setting.
+	 * @returns The ErrorInfo of the failure (NULL => saved successfully).
+	 */
+	private async setGlobalSetting(setting: string, value: any): Promise<ErrorInfo> {
+		const isValid = Object.prototype.hasOwnProperty.call(WRITABLE_GLOBAL_SETTINGS, setting)
+			? WRITABLE_GLOBAL_SETTINGS[setting]
+			: null;
+		if (isValid === null) {
+			this.logger.log('Rejected a request to save the setting "' + setting + '" (not a writable Global Setting).');
+			return 'The setting "' + setting + '" cannot be changed from the Settings page.';
+		}
+		if (!isValid(value)) {
+			return 'The value provided for the setting "' + setting + '" is invalid.';
+		}
+		try {
+			await vscode.workspace.getConfiguration('review-graph').update(setting, value, vscode.ConfigurationTarget.Global);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.log('Saving the setting "' + setting + '" failed: ' + message);
 			return message;
 		}
 		return null;
