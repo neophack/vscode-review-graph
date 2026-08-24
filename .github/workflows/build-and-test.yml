@@ -9,10 +9,21 @@ on:
     branches:
       - master
       - develop
+  # Lets the release workflow run this whole pipeline (the three-OS builds and tests, the
+  # packaged VSIX) before publishing anything.
+  workflow_call:
+  workflow_dispatch:
+
+# Least privilege: this workflow only builds, tests and packages. (When the release workflow calls
+# it, the caller's broader token cannot leak in — a called workflow's permissions are capped by
+# its own.)
+permissions:
+  contents: read
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -20,16 +31,26 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
-    - run: npm install
+        node-version-file: .nvmrc
+    - run: npm ci || npm install
     - run: npm run compile
     - run: npm test -- --runInBand
-    - name: Package extension
-      if: matrix.os == 'ubuntu-latest'
-      run: npx vsce package
-    - name: Upload extension package
-      if: matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v4
+
+  # A VSIX packaged on every push and pull request, so packaging regressions (a broken build, a
+  # bad .vscodeignore, a README vsce rejects) surface in CI and not at release time.
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
       with:
-        name: gerrit-graph-vsix
-        path: '*.vsix'
+        node-version-file: .nvmrc
+    - run: npm ci || npm install
+    # vsce runs `vscode:prepublish` (= `npm run compile`), so this packages a freshly built tree.
+    - run: npx vsce package --out review-graph.vsix
+    - uses: actions/upload-artifact@v4
+      with:
+        name: review-graph-vsix
+        path: review-graph.vsix
+        if-no-files-found: error

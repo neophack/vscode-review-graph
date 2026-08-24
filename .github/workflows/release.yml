@@ -1,0 +1,95 @@
+name: Release
+
+# A manual release: run the whole "Build & Test" workflow (the three-OS builds and tests, the
+# packaged VSIX), then package the VSIX again under the resolved version and publish a GitHub
+# Release carrying it. The extension is pure TypeScript with no native binaries, so the VSIX is
+# rebuilt from the same commit that passed the pipeline rather than assembled from build
+# artifacts (vsce's `vscode:prepublish` reruns the full compile either way).
+#
+# Trigger it from the Actions tab ("Release" → "Run workflow") or with:
+#
+#   gh workflow run release.yml -f version=v1.39.0
+#
+# The tag defaults to the version in package.json; pass `version` to override (the VSIX's version
+# is updated to match, so the release asset and the tag never disagree).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (defaults to package.json, e.g. v1.39.0)'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: 'Mark the release as a pre-release'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  # Creating the release (tag, notes, assets) is the one thing this workflow does beyond CI.
+  contents: write
+
+jobs:
+  # Everything "Build & Test" does: the three-OS builds and tests and the packaged VSIX. A
+  # release is only made when all of it passes.
+  build-and-test:
+    uses: ./.github/workflows/build-and-test.yml
+
+  release:
+    name: Publish the release
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Resolve the release tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="$INPUT_VERSION"
+          if [ -z "$VERSION" ]; then
+            VERSION="v$(node -p "require('./package.json').version")"
+          fi
+          case "$VERSION" in
+            v*) ;;
+            *)  VERSION="v$VERSION" ;;
+          esac
+          echo "TAG=$VERSION" >> "$GITHUB_ENV"
+
+          # Keep the VSIX version and the tag in agreement when an override was given.
+          PKG_VERSION="${VERSION#v}"
+          if [ "$(node -p "require('./package.json').version")" != "$PKG_VERSION" ]; then
+            npm pkg set version="$PKG_VERSION"
+            echo "package.json bumped to $PKG_VERSION to match the tag"
+          fi
+
+      # vsce runs `vscode:prepublish` (= `npm run compile`) and then writes the VSIX.
+      - name: Package the VSIX
+        run: npx vsce package --out "review-graph-${TAG#v}.vsix"
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Review Graph ${{ env.TAG }}
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease }}
+          fail_on_unmatched_files: true
+          files: |
+            review-graph-*.vsix
+
+      # A direct download path that does not need the release page.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-graph-vsix-${{ env.TAG }}
+          path: review-graph-*.vsix
+          if-no-files-found: error
