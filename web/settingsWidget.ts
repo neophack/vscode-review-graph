@@ -314,7 +314,9 @@ class SettingsWidget {
 			if (gerritConfig.enabled) {
 				const gerritCacheValue = gerritConfig.fetchMode === 'all'
 					? strings.settingsAllOpenChanges
-					: formatStr(strings.settingsLatestChanges, String(gerritConfig.fetchLimit));
+					: gerritConfig.fetchMode === 'off'
+						? strings.settingsFetchOff
+						: formatStr(strings.settingsLatestChanges, String(gerritConfig.fetchLimit));
 				const gerritCacheStr = escapeHtml(gerritCacheValue + ' (' + strings.settingsGlobal + ')');
 				globalHtml += '<table>' +
 					'<tr class="lineAbove"><td class="left">' + strings.settingsShowGerritBarLabel + '</td><td class="left"><label id="settingsShowGerritBar"><input type="checkbox" id="settingsShowGerritBarCheckbox" tabindex="-1"' + (gerritConfig.showControlsBar ? ' checked' : '') + '><span class="customCheckbox"></span>' + strings.settingsShowGerritBarCheckbox + '</label></td><td class="btns right"></td></tr>' +

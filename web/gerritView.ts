@@ -224,7 +224,18 @@ function gerritSubmitReviewAction(view: GitGraphView) {
 
 function gerritClearRefsAction(view: GitGraphView) {
 
-	dialog.showForm('Are you sure you want to delete all locally downloaded Gerrit change refs (<b>refs/remotes/' + escapeHtml(view.config.gerrit.remote) + '/changes/*</b>)?<br><span class="gg-hint">The downloaded change commits remain in the object database until Git garbage collects them. If Gerrit fetching is enabled, the latest changes will be re-downloaded on the next refresh.</span>', [], 'Yes, delete', () => {
+	dialog.showForm('Are you sure you want to delete all locally downloaded Gerrit change refs (<b>refs/remotes/' + escapeHtml(view.config.gerrit.remote) + '/changes/*</b>)?<br><span class="gg-hint">The downloaded change commits remain in the object database until Git garbage collects them. Gerrit change fetching will be turned off, so the deleted refs are not re-downloaded on the next refresh.</span>', [], 'Yes, delete', () => {
+
+		// Deselect every status filter chip: with fetching turned off there is no Gerrit data to filter, and selecting a chip again re-enables fetching
+		view.gerritStatusFilter = { new: false, merged: false, abandoned: false, wip: false };
+
+		for (const elem of Array.from(document.querySelectorAll('#gerritFilterControl .gerritFilterChip'))) {
+
+			(<HTMLElement>elem).classList.remove('active');
+
+		}
+
+		view.saveState();
 
 		runAction({ command: 'gerritClearRefs', repo: view.currentRepo }, 'Clearing Gerrit Refs');
 
@@ -403,6 +414,15 @@ function initGerritControls(view: GitGraphView) {
 			chip.classList.toggle('active', view.gerritStatusFilter![status]);
 
 			view.saveState();
+
+			if (view.config.gerrit.fetchMode === 'off') {
+
+				// Gerrit change fetching is turned off (after "Clear Refs"): selecting a chip re-enables it, and the configuration change reloads the view and re-downloads the change refs
+				runAction({ command: 'gerritEnableFetching', repo: view.currentRepo }, 'Fetching Gerrit Changes');
+
+				return;
+
+			}
 
 			// The status filter is applied locally by the Webview (the extension serves ALL cached
 			// Gerrit states): re-render the badges immediately, without reloading the commits.

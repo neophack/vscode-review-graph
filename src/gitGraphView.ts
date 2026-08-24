@@ -114,6 +114,7 @@ export class GitGraphView extends Disposable {
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
 
+	private gerritFetchModeRestore: 'latest' | 'all' = 'latest'; // the fetch mode active before "Clear Refs" turned Gerrit change fetching off
 	private gerritCache: Map<string, GerritCacheEntry> = new Map();
 	private gerritFetches: Map<string, Promise<GerritCacheEntry | null>> = new Map();
 	private gerritCacheGeneration: number = 0; // incremented whenever the Gerrit fetch settings change, so stale in-flight fetches don't repopulate the cache
@@ -131,6 +132,22 @@ export class GitGraphView extends Disposable {
 	 */
 	private readonly commitCache: Map<string, Promise<GitCommitData>> = new Map();
 	private static readonly COMMIT_CACHE_LIMIT = 32;
+	/**
+	 * Commands whose handlers can modify the repository (its HEAD, refs, stash, index, working tree
+	 * or Git config). They run with the RepoFileWatcher muted, so the watcher-based commit cache
+	 * invalidation never fires for changes the view makes itself: these commands must invalidate
+	 * the cache directly (see `respondToMessage`), otherwise the `loadCommits` request of the
+	 * webview's post-action refresh is served pre-action data - e.g. a stale HEAD after a checkout,
+	 * leaving the current-position marker on the previously checked-out commit.
+	 */
+	private static readonly REPO_MUTATING_COMMANDS: ReadonlySet<string> = new Set([
+		'addRemote', 'addTag', 'applyStash', 'branchFromStash', 'checkoutBranch', 'checkoutCommit', 'cherrypickCommit',
+		'cleanUntrackedFiles', 'createBranch', 'createPullRequest', 'deleteBranch', 'deleteRemote', 'deleteRemoteBranch',
+		'deleteTag', 'dropCommit', 'dropStash', 'editRemote', 'editUserDetails', 'fetch', 'fetchIntoLocalBranch', 'merge',
+		'popStash', 'pruneRemote', 'pullBranch', 'pushBranch', 'pushStash', 'pushTag', 'rebase', 'renameBranch',
+		'resetFileToRevision', 'resetToCommit', 'revertCommit', 'editCommitMessage', 'undoLastCommit',
+		'gerritSubmitReview', 'gerritFetchChange', 'gerritClearRefs', 'gerritInstallHook', 'gerritAmendChangeId', 'gerritAutosquash'
+	]);
 
 	/**
 	 * If a Git Graph View already exists, show and update it. Otherwise, create a Git Graph View.
@@ -299,6 +316,13 @@ export class GitGraphView extends Disposable {
 			showErrorMessage('Review Graph encountered an error while handling this action.');
 		} finally {
 			this.repoFileWatcher.unmute();
+			if (GitGraphView.REPO_MUTATING_COMMANDS.has(msg.command)) {
+				// The handler ran with the RepoFileWatcher muted, so any repository change it made
+				// bypassed the watcher-based cache invalidation. Drop the cached commit data even
+				// when the action failed: a partially completed action (e.g. a conflicted merge)
+				// may still have moved refs, and the cost of re-running Git once is negligible.
+				this.commitCache.clear();
+			}
 		}
 	}
 
@@ -687,6 +711,12 @@ export class GitGraphView extends Disposable {
 				this.sendMessage({
 					command: 'gerritClearRefs',
 					...await this.gerritClearRefs(msg.repo)
+				});
+				break;
+			case 'gerritEnableFetching':
+				this.sendMessage({
+					command: 'gerritEnableFetching',
+					error: await this.gerritEnableFetching()
 				});
 				break;
 			case 'gerritGetHookStatus':
@@ -1755,12 +1785,53 @@ export class GitGraphView extends Disposable {
 	}
 
 	/**
-	 * Delete every locally downloaded Gerrit change ref (refs/remotes/<remote>/changes/*) of a repository.
+	 * Delete every locally downloaded Gerrit change ref (refs/remotes/<remote>/changes/*) of a repository,
+	 * and turn Gerrit change fetching off so a refresh doesn't immediately re-download the deleted refs
+	 * (where they would clutter other Git graph views reading the repository's refs).
 	 */
 	private async gerritClearRefs(repo: string): Promise<{ error: ErrorInfo; cleared: number }> {
-		const result = await this.dataSource.gerrit.clearLocalChanges(repo, getConfig().gerrit.remote);
-		if (result.error === null) this.invalidateGerritCache(repo); // the deleted refs must not be served from the cache
+		const config = getConfig().gerrit;
+		const result = await this.dataSource.gerrit.clearLocalChanges(repo, config.remote);
+		if (result.error !== null) return result;
+
+		if (config.fetchMode !== 'off') this.gerritFetchModeRestore = config.fetchMode === 'all' ? 'all' : 'latest';
+		try {
+			await vscode.workspace.getConfiguration('review-graph').update('gerrit.fetchMode', 'off', vscode.ConfigurationTarget.Global);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.log('Turning Gerrit change fetching off failed: ' + message);
+			return { error: <ErrorInfo>message, cleared: result.cleared };
+		}
+
+		// Drop all cached Gerrit data, so the deleted refs are not served (offline) either; the
+		// onDidChangeConfiguration listener reloads the Git Graph View with fetching disabled
+		this.gerritStaleRepos.clear();
+		this.gerritCache.clear();
+		this.gerritFetches.clear();
+		this.gerritCacheGeneration++;
 		return result;
+	}
+
+	/**
+	 * Re-enable Gerrit change fetching (which the "Clear Refs" action turned off), restoring the
+	 * fetch mode that was active before. The configuration change reloads the Git Graph View, which
+	 * re-downloads the change refs.
+	 */
+	private async gerritEnableFetching(): Promise<ErrorInfo> {
+		try {
+			await vscode.workspace.getConfiguration('review-graph').update('gerrit.fetchMode', this.gerritFetchModeRestore, vscode.ConfigurationTarget.Global);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.log('Turning Gerrit change fetching back on failed: ' + message);
+			return message;
+		}
+
+		// Drop all cached Gerrit data, so the change refs are freshly fetched on the next load
+		this.gerritStaleRepos.clear();
+		this.gerritCache.clear();
+		this.gerritFetches.clear();
+		this.gerritCacheGeneration++;
+		return null;
 	}
 
 	/**

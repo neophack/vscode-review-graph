@@ -1026,6 +1026,13 @@ export interface ResponseGerritClearRefs extends ResponseWithErrorInfo {
 	readonly cleared: number; // the number of local Gerrit change refs deleted
 }
 
+export interface RequestGerritEnableFetching extends RepoRequest {
+	readonly command: 'gerritEnableFetching';
+}
+export interface ResponseGerritEnableFetching extends ResponseWithErrorInfo {
+	readonly command: 'gerritEnableFetching';
+}
+
 export interface GerritHookStatus {
 	readonly name: string; // the hook file name, e.g. "commit-msg"
 	readonly installed: boolean; // TRUE => the hook file exists in <git-dir>/hooks/
@@ -1555,6 +1562,7 @@ export type RequestMessage =
 	| RequestGerritAmendChangeId
 	| RequestGerritAutosquash
 	| RequestGerritClearRefs
+	| RequestGerritEnableFetching
 	| RequestGerritGetHookStatus
 	| RequestGerritInstallHook
 	| RequestGerritFetchChange
@@ -1635,6 +1643,7 @@ export type ResponseMessage =
 	| ResponseGerritAutosquash
 	| ResponseGerritAmendChangeId
 	| ResponseGerritClearRefs
+	| ResponseGerritEnableFetching
 	| ResponseGerritGetHookStatus
 	| ResponseGerritInstallHook
 	| ResponseGerritFetchChange

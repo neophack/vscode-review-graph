@@ -2195,10 +2195,19 @@ window.addEventListener('load', () => {
 				break;
 			case 'gerritClearRefs':
 				if (msg.error === null) {
-					dialog.showMessage('Deleted <b>' + msg.cleared + '</b> Gerrit change ref' + (msg.cleared === 1 ? '' : 's') + ' from <b>refs/remotes/' + escapeHtml(initialState.config.gerrit.remote) + '/changes/*</b>.');
+					dialog.showMessage('Deleted <b>' + msg.cleared + '</b> Gerrit change ref' + (msg.cleared === 1 ? '' : 's') + ' from <b>refs/remotes/' + escapeHtml(initialState.config.gerrit.remote) + '/changes/*</b>.<br>Gerrit change fetching has been turned off - select one of the status filter chips (Open / Merged / Abandoned / WIP) to download changes again.');
 					gitGraph.refresh(false, false);
 				} else {
 					dialog.showError('Unable to Clear Gerrit Refs', msg.error, null, null);
+				}
+				break;
+			case 'gerritEnableFetching':
+				if (msg.error === null) {
+					// Saving the setting reloads the Git Graph View, which re-downloads the Gerrit
+					// change refs according to the restored fetch configuration
+					dialog.closeActionRunning();
+				} else {
+					dialog.showError('Unable to Enable Gerrit Fetching', msg.error, null, null);
 				}
 				break;
 			case 'gerritGetHookStatus':
