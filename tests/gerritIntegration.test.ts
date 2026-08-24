@@ -49,7 +49,17 @@ function rmRecursive(target: string) {
 			}
 		}
 	}
-	fs.rmdirSync(target);
+	// Windows can keep a directory handle briefly open after a Git subprocess exited (EBUSY);
+	// wait a moment and retry instead of failing an otherwise-passed test during cleanup.
+	for (let attempt = 0; ; attempt++) {
+		try {
+			fs.rmdirSync(target);
+			return;
+		} catch (e) {
+			if (attempt >= 10 || ['EBUSY', 'EPERM', 'ENOTEMPTY'].indexOf(e.code || '') === -1) throw e;
+		}
+		cp.spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},25)']);
+	}
 }
 
 jest.setTimeout(120000);
@@ -69,7 +79,7 @@ function git(cwd: string, args: string[], env: { [key: string]: string } = {}) {
 		encoding: 'utf8'
 	});
 	if (result.status !== 0) {
-		throw new Error('git ' + args.join(' ') + ' failed in ' + cwd + ':\n' + result.stderr);
+		throw new Error('git ' + args.join(' ') + ' failed in ' + cwd + ':\n' + (result.stderr || (result.error ? result.error.message : 'unknown error')));
 	}
 	return (result.stdout || '').trim();
 }

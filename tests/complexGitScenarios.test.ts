@@ -46,7 +46,17 @@ function rmRecursive(target: string) {
 			}
 		}
 	}
-	fs.rmdirSync(target);
+	// Windows can keep a directory handle briefly open after a Git subprocess exited (EBUSY);
+	// wait a moment and retry instead of failing an otherwise-passed test during cleanup.
+	for (let attempt = 0; ; attempt++) {
+		try {
+			fs.rmdirSync(target);
+			return;
+		} catch (e) {
+			if (attempt >= 10 || ['EBUSY', 'EPERM', 'ENOTEMPTY'].indexOf(e.code || '') === -1) throw e;
+		}
+		cp.spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},25)']);
+	}
 }
 
 jest.setTimeout(120000);
@@ -65,7 +75,7 @@ function git(cwd: string, args: string[], env: { [key: string]: string } = {}) {
 		encoding: 'utf8'
 	});
 	if (result.status !== 0) {
-		throw new Error('git ' + args.join(' ') + ' failed in ' + cwd + ':\n' + result.stderr);
+		throw new Error('git ' + args.join(' ') + ' failed in ' + cwd + ':\n' + (result.stderr || (result.error ? result.error.message : 'unknown error')));
 	}
 	return (result.stdout || '').trim();
 }
@@ -81,11 +91,15 @@ const at = (epoch: number) => ({
 
 /** Recursively ensure a directory exists (the bundled Node typings predate recursive mkdir). */
 function ensureDir(dir: string) {
-	const parts = dir.split(path.sep);
-	let cur = '';
-	for (const part of parts) {
+	// A leading separator must anchor the walk to the filesystem root: dropping it (as splitting
+	// '/tmp/x' into ['', 'tmp', 'x'] and joining naively does) would create the tree RELATIVE to
+	// the current working directory on macOS and Linux. A Windows drive letter ('C:') anchors
+	// itself, so only POSIX-style absolute paths need the explicit root prefix.
+	let cur = dir.split(path.sep)[0] === '' ? path.sep : '';
+	for (const part of dir.split(path.sep)) {
+		if (part === '') continue;
 		cur = cur === '' ? part : path.join(cur, part);
-		if (cur !== '' && !fs.existsSync(cur)) fs.mkdirSync(cur);
+		if (!fs.existsSync(cur)) fs.mkdirSync(cur);
 	}
 }
 

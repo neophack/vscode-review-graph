@@ -4622,6 +4622,14 @@ describe('DataSource', () => {
 		});
 
 		describe('Windows Mapped Network Drive Resolution', () => {
+			let platform: NodeJS.Platform;
+			beforeEach(() => {
+				platform = process.platform;
+			});
+			afterEach(() => {
+				Object.defineProperty(process, 'platform', { value: platform });
+			});
+
 			it('Should not alter non-network share drives', async () => {
 				// Setup
 				mockGitSuccessOnce('c:/path/to/repo/root');
