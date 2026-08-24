@@ -37,13 +37,23 @@ function rmRecursive(target: string) {
 	if (!fs.existsSync(target)) return;
 	for (const entry of fs.readdirSync(target)) {
 		const entryPath = path.join(target, entry);
-		if (fs.statSync(entryPath).isDirectory()) {
+		// A Git subprocess may still be finishing and delete an entry (e.g. .git/index.lock)
+		// after the readdir above listed it: an entry that is already gone needs no removal.
+		let isDirectory: boolean;
+		try {
+			isDirectory = fs.statSync(entryPath).isDirectory();
+		} catch (e) {
+			if (e.code === 'ENOENT') continue;
+			throw e;
+		}
+		if (isDirectory) {
 			rmRecursive(entryPath);
 		} else {
 			// Git marks its object files read-only: clear the flag before deleting (Windows)
 			try {
 				fs.unlinkSync(entryPath);
-			} catch (_) {
+			} catch (e) {
+				if (e.code === 'ENOENT') continue;
 				fs.chmodSync(entryPath, 0o666);
 				fs.unlinkSync(entryPath);
 			}

@@ -216,8 +216,14 @@ function rmRecursive(target: string) {
 	if (!fs.existsSync(target)) return;
 	for (const entry of fs.readdirSync(target)) {
 		const entryPath = path.join(target, entry);
-		if (fs.statSync(entryPath).isDirectory()) rmRecursive(entryPath);
-		else fs.unlinkSync(entryPath);
+		try {
+			if (fs.statSync(entryPath).isDirectory()) rmRecursive(entryPath);
+			else fs.unlinkSync(entryPath);
+		} catch (e) {
+			// A Git subprocess may delete an entry (e.g. .git/index.lock) concurrently with
+			// this cleanup: an entry that is already gone needs no removal.
+			if (e.code !== 'ENOENT') throw e;
+		}
 	}
 	fs.rmdirSync(target);
 }

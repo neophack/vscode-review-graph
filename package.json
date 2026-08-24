@@ -3,9 +3,6 @@
 	"displayName": "%displayName%",
 	"version": "1.38.8",
 	"publisher": "aucneon",
-	"engine": {
-		"node": "18.17.1"
-	},
 	"author": {
 		"name": "aucneon"
 	},
