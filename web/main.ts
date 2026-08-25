@@ -185,8 +185,8 @@ class GitGraphView {
 		this.renderRefreshButton();
 		if (prevState) {
 			// Restore the Gerrit controls state before they are initialised, so that the chip selections
-			// survive the Webview being reloaded (e.g. switching away from the panel and back)
-			if (prevState.gerritStatusFilter !== null && prevState.gerritStatusFilter !== undefined) this.gerritStatusFilter = prevState.gerritStatusFilter;
+			// survive the Webview being reloaded (e.g. switching away from the panel and back). The
+			// status filter chips themselves persist in the repository's state instead.
 			if (prevState.commitPathFilter !== null && prevState.commitPathFilter !== undefined) this.commitPathFilter = prevState.commitPathFilter;
 		}
 		initGerritControls(this);
@@ -1132,7 +1132,6 @@ class GitGraphView {
 			scrollTop: this.scrollTop,
 			findWidget: this.findWidget.getState(),
 			settingsWidget: this.settingsWidget.getState(),
-			gerritStatusFilter: this.gerritStatusFilter,
 			commitPathFilter: this.commitPathFilter,
 			compareSourceHash: this.compareSourceHash
 		});

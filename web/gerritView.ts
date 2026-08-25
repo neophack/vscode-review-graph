@@ -235,7 +235,7 @@ function gerritClearRefsAction(view: GitGraphView) {
 
 		}
 
-		view.saveState();
+		view.saveRepoStateValue(view.currentRepo, 'gerritStatusFilter', view.gerritStatusFilter);
 
 		runAction({ command: 'gerritClearRefs', repo: view.currentRepo }, 'Clearing Gerrit Refs');
 
@@ -389,7 +389,15 @@ function initGerritControls(view: GitGraphView) {
 
 	if (filterControl === null) return;
 
-	view.gerritStatusFilter = view.gerritStatusFilter !== null ? view.gerritStatusFilter : Object.assign({}, view.config.gerrit.statusFilter);
+	// The selected chips persist in the repository's state, so reopening the view (or VS Code)
+	// restores them; NULL => the repository has no persisted selection, so the global config's
+	// default filter applies
+	const repo = view.gitRepos[view.currentRepo];
+	view.gerritStatusFilter = view.gerritStatusFilter !== null
+		? view.gerritStatusFilter
+		: repo !== undefined && repo.gerritStatusFilter !== null && repo.gerritStatusFilter !== undefined
+			? repo.gerritStatusFilter
+			: Object.assign({}, view.config.gerrit.statusFilter);
 
 	const chips: { status: keyof GG.GerritStatusFilter, label: string }[] = [
 
@@ -413,7 +421,9 @@ function initGerritControls(view: GitGraphView) {
 
 			chip.classList.toggle('active', view.gerritStatusFilter![status]);
 
-			view.saveState();
+			// Persist the selection with the repository's state, so it survives the view being
+			// closed and reopened
+			view.saveRepoStateValue(view.currentRepo, 'gerritStatusFilter', view.gerritStatusFilter);
 
 			if (view.config.gerrit.fetchMode === 'off') {
 

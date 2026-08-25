@@ -285,6 +285,7 @@ export interface GitRepoState {
 	columnWidths: ColumnWidth[] | null;
 	commitOrdering: RepoCommitOrdering;
 	fileViewType: FileViewType;
+	gerritStatusFilter: GerritStatusFilter | null; // the selected Gerrit status filter chips (null => use the global config's default filter)
 	hideRemotes: string[];
 	includeCommitsMentionedByReflogs: BooleanOverride;
 	issueLinkingConfig: IssueLinkingConfig | null;

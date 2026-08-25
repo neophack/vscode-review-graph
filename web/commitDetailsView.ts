@@ -428,6 +428,10 @@ function requestLineCounts(view: GitGraphView, paths: string[]) {
 
 	if (expandedCommit === null || fromTo === null || paths.length === 0) return;
 
+	// Nothing left to settle (everything already settled, or a working-tree view whose counts
+	// arrived with the file list): a stale scroll timer must not send a pointless request
+	if (expandedCommit.lineCounts.pending === null || expandedCommit.lineCounts.pending.size === 0) return;
+
 	for (let i = 0; i < paths.length; i++) expandedCommit.lineCounts.requested.add(paths[i]);
 
 	sendMessage({
