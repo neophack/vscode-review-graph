@@ -860,7 +860,7 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', 'origin/develop');
+					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', 'origin/develop', false);
 					expect(spyOnPullBranch).not.toHaveBeenCalled();
 					expect(messages).toStrictEqual([
 						{
@@ -897,7 +897,7 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', null);
+					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', null, false);
 					expect(spyOnPullBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', 'origin', true, false);
 					expect(messages).toStrictEqual([
 						{
@@ -937,7 +937,7 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', null);
+					expect(spyOnCheckoutBranch).toHaveBeenCalledWith('/path/to/repo', 'develop', null, false);
 					expect(spyOnPullBranch).not.toHaveBeenCalled();
 					expect(messages).toStrictEqual([
 						{
@@ -971,7 +971,7 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnCheckoutCommit).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
+					expect(spyOnCheckoutCommit).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', false);
 					expect(messages).toStrictEqual([
 						{
 							command: 'checkoutCommit',
@@ -1341,7 +1341,7 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnCreateBranch).toHaveBeenCalledWith('/path/to/repo', 'feature-1', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', true, false);
+					expect(spyOnCreateBranch).toHaveBeenCalledWith('/path/to/repo', 'feature-1', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', true, false, false);
 					expect(messages).toStrictEqual([
 						{
 							command: 'createBranch',

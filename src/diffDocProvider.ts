@@ -60,7 +60,7 @@ export class DiffDocProvider extends Disposable implements vscode.TextDocumentCo
 
 			return await this.dataSource.getCommitFile(request.repo, request.commit, request.filePath).then(
 				(contents) => {
-					const document = new DiffDocument(contents);
+					const document = new DiffDocument(contents !== null ? contents : 'This file is binary, so its contents cannot be displayed.');
 					this.docs.set(uri.toString(), document);
 					return document.value;
 				},

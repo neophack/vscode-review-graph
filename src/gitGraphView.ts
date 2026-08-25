@@ -11,14 +11,14 @@ const MEDIA_CACHE_VERSION = '1.39.1';
 import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
 import { CommitComparisonView } from './comparisonView';
-import { DataSource, GitCommitData, GitCommitDetailsData, GitConfigKey } from './dataSource';
+import { DataSource, GitCommitData, GitCommitDetailsData, GitCommitFileCountsData, GitConfigKey } from './dataSource';
 import { ExtensionState } from './extensionState';
 import { buildFetchRefspecs, changeShard, extractChangeId, filterChangeStates, generateChangeId, hasChangeId, limitChanges, normalizeGerritFetchLimit, parseChangeRef, parseLsRemoteChanges } from './gerrit';
 import { Logger } from './logger';
 import { PullRequestDataSource } from './pullRequests';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
-import { ErrorInfo, GerritChangeState, GerritStatusFilter, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestLoadCommits, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
+import { ErrorInfo, GerritChangeState, GerritStatusFilter, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, LossWarning, RequestLoadCommits, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, encodeJsonForInlineScript, getNonce, isSafeRefName, isValidCommitHash, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
 
@@ -327,6 +327,21 @@ export class GitGraphView extends Disposable {
 	}
 
 	/**
+	 * Forward a data-loss warning returned by an action to the view: its standard warning dialog
+	 * shows the message (with the mascot image), and confirming re-sends the original request
+	 * with its confirmed flag set.
+	 * @param result The action result: a warning, or an array that may hold one.
+	 * @param request The original request, replayed on confirmation.
+	 * @returns TRUE when a warning was forwarded and the action must not report a result.
+	 */
+	private sendLossWarning(result: ErrorInfo | LossWarning | ReadonlyArray<ErrorInfo | LossWarning>, request: RequestMessage): boolean {
+		const warning = Array.isArray(result) ? result[0] : result;
+		if (warning === null || typeof warning !== 'object' || !('message' in warning)) return false;
+		this.sendMessage({ command: 'lossWarning', message: warning.message, retry: { ...request, confirmed: true } as RequestMessage });
+		return true;
+	}
+
+	/**
 	 * Handle a message sent from the front-end.
 	 * Any error thrown by a handler is caught and logged by `respondToMessage`.
 	 * @param msg The message that was received.
@@ -367,8 +382,10 @@ export class GitGraphView extends Disposable {
 					error: await this.dataSource.branchFromStash(msg.repo, msg.selector, msg.branchName)
 				});
 				break;
-			case 'checkoutBranch':
-				errorInfos = [await this.dataSource.checkoutBranch(msg.repo, msg.branchName, msg.remoteBranch)];
+			case 'checkoutBranch': {
+				const checkoutResult = await this.dataSource.checkoutBranch(msg.repo, msg.branchName, msg.remoteBranch, msg.confirmed === true);
+				if (this.sendLossWarning(checkoutResult, msg)) break;
+				errorInfos = [<ErrorInfo>checkoutResult];
 				if (errorInfos[0] === null && msg.pullAfterwards !== null) {
 					errorInfos.push(await this.dataSource.pullBranch(msg.repo, msg.pullAfterwards.branchName, msg.pullAfterwards.remote, msg.pullAfterwards.createNewCommit, msg.pullAfterwards.squash));
 				}
@@ -378,12 +395,16 @@ export class GitGraphView extends Disposable {
 					errors: errorInfos
 				});
 				break;
-			case 'checkoutCommit':
+			}
+			case 'checkoutCommit': {
+				const checkoutResult = await this.dataSource.checkoutCommit(msg.repo, msg.commitHash, msg.confirmed === true);
+				if (this.sendLossWarning(checkoutResult, msg)) break;
 				this.sendMessage({
 					command: 'checkoutCommit',
-					error: await this.dataSource.checkoutCommit(msg.repo, msg.commitHash)
+					error: <ErrorInfo>checkoutResult
 				});
 				break;
+			}
 			case 'cherrypickCommit':
 				errorInfos = [await this.dataSource.cherrypickCommit(msg.repo, msg.commitHash, msg.parentIndex, msg.recordOrigin, msg.noCommit)];
 				if (errorInfos[0] === null && msg.noCommit) {
@@ -425,6 +446,19 @@ export class GitGraphView extends Disposable {
 				this.sendMessage({ command: 'commitBodies', bodies: bodies });
 				break;
 			}
+			case 'commitFileCounts': {
+				// The deferred +N/-M counts of the open Commit Details / Commit Comparison view,
+				// asked for a viewport at a time after the file list itself has rendered
+				const counts: GitCommitFileCountsData = await this.dataSource.getCommitFileCounts(msg.repo, msg.from, msg.to, msg.paths);
+				this.sendMessage({
+					command: 'commitFileCounts',
+					commitHash: msg.commitHash,
+					compareWithHash: msg.compareWithHash,
+					counts: counts.counts,
+					error: counts.error
+				});
+				break;
+			}
 			case 'compareCommits':
 				this.sendMessage({
 					command: 'compareCommits',
@@ -454,12 +488,15 @@ export class GitGraphView extends Disposable {
 					error: await archive(msg.repo, msg.ref, this.dataSource)
 				});
 				break;
-			case 'createBranch':
+			case 'createBranch': {
+				const createResult = await this.dataSource.createBranch(msg.repo, msg.branchName, msg.commitHash, msg.checkout, msg.force, msg.confirmed === true);
+				if (this.sendLossWarning(createResult, msg)) break;
 				this.sendMessage({
 					command: 'createBranch',
-					errors: await this.dataSource.createBranch(msg.repo, msg.branchName, msg.commitHash, msg.checkout, msg.force)
+					errors: <ErrorInfo[]>createResult
 				});
 				break;
+			}
 			case 'createPullRequest':
 				errorInfos = [msg.push ? await this.dataSource.pushBranch(msg.repo, msg.sourceBranch, msg.sourceRemote, true, GitPushBranchMode.Normal) : null];
 				if (errorInfos[0] === null) {

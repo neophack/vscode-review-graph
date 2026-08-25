@@ -1039,7 +1039,7 @@ class GitGraphView {
 
 		this.renderRefreshButton();
 		if (this.commits.length === 0) {
-			this.tableElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + strings.loading + '</h2>';
+			this.tableElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + strings.loading + '</h2><div class="skeletonRows">' + '<div class="skeletonRow"></div>'.repeat(10) + '</div>';
 		}
 
 		if (skipRepoInfo) {
@@ -1161,6 +1161,14 @@ class GitGraphView {
 			codeReview: null,
 			lastViewedFile: null,
 			loading: true,
+			lineCounts: {
+				pending: null,
+				requested: new Set<string>(),
+				queue: [],
+				byPath: null,
+				chunkInFlight: false,
+				scrollTimer: 0
+			},
 			scrollTop: {
 				summary: 0,
 				fileView: 0
@@ -1232,13 +1240,13 @@ class GitGraphView {
 		let html = '<span class="unselectable pinnedRowLabel">' + strings.pinnedLabel + '</span>';
 		for (const branch of pinnedBranches) {
 			const name = escapeHtml(branch);
-			html += '<span class="pinnedChip" data-type="branch" data-value="' + name + '"' + formatStr(strings.pinnedBranchChipTitle, name) + '">\uD83D\uDCCC ' + name +
+			html += '<span class="pinnedChip" data-type="branch" data-value="' + name + '" title="' + formatStr(strings.pinnedBranchChipTitle, name) + '">\uD83D\uDCCC ' + name +
 				'<span class="pinnedChipRemove" data-type="branch" data-value="' + name + '" title="' + formatStr(strings.pinnedUnpinBranch, name) + '">&times;</span></span>';
 		}
 		for (const pinned of pinnedCommits) {
 			const hash = escapeHtml(pinned.hash);
 			const summary = escapeHtml(pinned.summary.length > 30 ? pinned.summary.substring(0, 30) + '…' : pinned.summary);
-			html += '<span class="pinnedChip" data-type="commit" data-value="' + hash + '"' + formatStr(strings.pinnedCommitChipTitle, hash) + '">\uD83D\uDCCC <b>' + abbrevCommit(pinned.hash) + '</b>' + (summary !== '' ? ' ' + summary : '') +
+			html += '<span class="pinnedChip" data-type="commit" data-value="' + hash + '" title="' + formatStr(strings.pinnedCommitChipTitle, hash) + '">\uD83D\uDCCC <b>' + abbrevCommit(pinned.hash) + '</b>' + (summary !== '' ? ' ' + summary : '') +
 				'<span class="pinnedChipRemove" data-type="commit" data-value="' + hash + '" title="' + formatStr(strings.pinnedUnpinCommit, hash) + '">&times;</span></span>';
 		}
 		controls.innerHTML = html;
@@ -1822,8 +1830,12 @@ class GitGraphView {
 			'Tag <b><i>' + escapeHtml(tagName) + '</i></b><br><span class="messageContent">' +
 			'<b>Object: </b>' + escapeHtml(details.hash) + '<br>' +
 			'<b>Commit: </b>' + escapeHtml(commitHash) + '<br>' +
-			'<b>Tagger: </b>' + escapeHtml(details.taggerName) + ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(details.taggerEmail) + '" tabindex="-1">' + escapeHtml(details.taggerEmail) + '</a>&gt;' + (details.signature !== null ? generateSignatureHtml(details.signature) : '') + '<br>' +
-			'<b>Date: </b>' + formatLongDate(details.taggerDate) + '<br><br>' +
+			// A lightweight tag has no tagger of its own, so the Tagger/Date rows are hidden
+			// rather than shown with an empty name and an invalid date
+			(details.taggerName !== '' || details.taggerEmail !== ''
+				? '<b>Tagger: </b>' + escapeHtml(details.taggerName) + ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(details.taggerEmail) + '" tabindex="-1">' + escapeHtml(details.taggerEmail) + '</a>&gt;' + (details.signature !== null ? generateSignatureHtml(details.signature) : '') + '<br>' +
+				'<b>Date: </b>' + formatLongDate(details.taggerDate) + '<br><br>'
+				: '') +
 			textFormatter.format(details.message) +
 			'</span>'
 		);
@@ -2244,6 +2256,14 @@ window.addEventListener('load', () => {
 			case 'commitBodies':
 				gitGraph.processCommitBodies(msg);
 				break;
+			case 'commitFileCounts':
+				applyLineCounts(gitGraph, msg);
+				break;
+			case 'lossWarning':
+				// A data-loss risk only the extension host could assess: confirm re-sends the
+				// original request with its confirmed flag set, so the action runs without asking again
+				dialog.showDataLossWarning(msg.message, () => sendMessage(msg.retry));
+				break;
 			case 'countCommitsBefore':
 				gitGraph.processCountCommitsBefore(msg);
 				break;
@@ -2590,7 +2610,59 @@ function getRepoDropdownOptions(repos: Readonly<GG.GitRepoSet>) {
 	return options;
 }
 
+/**
+ * Assess whether an action can cause the user to lose data, and if so describe the risk.
+ * Covers every write operation performed via runAction, so operations that bypass the
+ * per-action confirmation dialogs are still guarded.
+ * @param msg The request message describing the action that is about to be performed.
+ * @returns The HTML describing the data loss risk, or null if the action cannot lose data.
+ */
+function getDataLossRisk(msg: GG.RequestMessage): string | null {
+	switch (msg.command) {
+		case 'resetToCommit':
+			return msg.resetMode === GG.GitResetMode.Hard ? strings.riskResetHard : null;
+		case 'cleanUntrackedFiles':
+			return (msg.directories ? strings.riskCleanUntrackedDirectories : strings.riskCleanUntrackedFiles) + ' ' + strings.riskCleanUntrackedSuffix;
+		case 'deleteBranch': {
+			const risks: string[] = [];
+			if (msg.forceDelete) risks.push(formatStr(strings.riskDeleteBranchForce, escapeHtml(msg.branchName)));
+			if (msg.deleteOnRemotes.length > 0) risks.push(formatStr(strings.riskDeleteBranchRemote, escapeHtml(formatCommaSeparatedList(msg.deleteOnRemotes.map((remote) => '"' + remote + '"')))));
+			return risks.length > 0 ? risks.join('<br>') : null;
+		}
+		case 'deleteRemoteBranch':
+			return formatStr(strings.riskDeleteRemoteBranch, escapeHtml(msg.remote + '/' + msg.branchName));
+		case 'pushBranch': {
+			const target = escapeHtml(formatCommaSeparatedList(msg.remotes.map((remote) => remote + '/' + msg.branchName)));
+			return msg.mode === GG.GitPushBranchMode.Force
+				? formatStr(strings.riskPushForce, target)
+				: msg.mode === GG.GitPushBranchMode.ForceWithLease
+					? formatStr(strings.riskPushForceWithLease, target)
+					: null;
+		}
+		case 'fetchIntoLocalBranch':
+			return msg.force ? formatStr(strings.riskFetchIntoLocalBranchForce, escapeHtml(msg.localBranch)) : null;
+		case 'dropCommit':
+			return strings.riskDropCommit;
+		case 'dropStash':
+			return strings.riskDropStash;
+		case 'resetFileToRevision':
+			return formatStr(strings.riskResetFile, escapeHtml(msg.filePath));
+		default:
+			return null;
+	}
+}
+
 function runAction(msg: GG.RequestMessage, action: string) {
+	const risk = getDataLossRisk(msg);
+	if (risk !== null) {
+		// The user has acknowledged this risk here, so the request is re-sent with its confirmed
+		// flag set — the extension host then skips its own (conditional) warnings for it
+		dialog.showDataLossWarning(risk, () => {
+			dialog.showActionRunning(action);
+			sendMessage({ ...msg, confirmed: true } as GG.RequestMessage);
+		});
+		return;
+	}
 	dialog.showActionRunning(action);
 	sendMessage(msg);
 }

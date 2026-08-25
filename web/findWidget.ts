@@ -236,7 +236,7 @@ class FindWidget {
 			} catch (e) {
 				findPattern = null;
 				findGlobalPattern = null;
-				this.widgetElem.setAttribute(ATTR_ERROR, e.message);
+				this.widgetElem.setAttribute(ATTR_ERROR, (<Error>e).message);
 			}
 			if (findPattern !== null && findGlobalPattern !== null) {
 				// A static snapshot: getCommitElems() returns a live HTMLCollection, and commitElems.length /

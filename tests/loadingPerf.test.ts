@@ -88,16 +88,18 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T, ms: number }>
 /**
  * Count how many Git processes an async operation spawns.
  */
-async function countSpawns<T>(fn: () => Promise<T>): Promise<{ value: T, ms: number, spawns: number }> {
+async function countSpawns<T>(fn: () => Promise<T>): Promise<{ value: T, ms: number, spawns: number, commands: string[][] }> {
 	const realSpawn = cp.spawn.bind(cp);
 	let spawns = 0;
+	const commands: string[][] = [];
 	const spy = jest.spyOn(cp, 'spawn').mockImplementation(((command: string, args: readonly string[], options: any) => {
 		spawns++;
+		commands.push([...args]);
 		return realSpawn(command, args as any[], options);
 	}) as any);
 	try {
 		const { value, ms } = await timed(fn);
-		return { value: value, ms: ms, spawns: spawns };
+		return { value: value, ms: ms, spawns: spawns, commands: commands };
 	} finally {
 		spy.mockRestore();
 	}
@@ -474,14 +476,20 @@ describe('Loading performance (complex Git repository, real Git)', () => {
 	/* 9. Uncommitted changes: `git status` must run in PARALLEL with the commit log & refs */
 	it('detects uncommitted changes in parallel with the commit log (dirty worktree)', async () => {
 		fs.writeFileSync(path.join(work, 'dirty-file.txt'), 'uncommitted content\n');
-		const { value: data, ms, spawns } = await countSpawns(() => dataSource.getCommits(work, null, null, 1000, true, true, false, false, CommitOrdering.Date, [REMOTE], [], [], null, false));
+		const { value: data, ms, spawns, commands } = await countSpawns(() => dataSource.getCommits(work, null, null, 1000, true, true, false, false, CommitOrdering.Date, [REMOTE], [], [], null, false));
 		record('10. commit graph with uncommitted changes (git status in parallel)', ms, spawns);
 
 		expect(data.error).toBeNull();
 		expect(data.commits[0].hash).toBe(UNCOMMITTED);
 		expect(data.commits[0].message).toBe('Uncommitted Changes (1)');
-		// git status + git log + git show-ref, all running concurrently (not sequentially)
-		expect(spawns).toBeLessThanOrEqual(3);
+		// Exactly one `git status` and one `git log`, both started up front (concurrently, not
+		// sequentially). The refs may add up to 3 more processes when the 3s ref snapshot cache
+		// has expired (show-ref + for-each-ref + symbolic-ref), which depends on timing, not on
+		// the code under test - so only the per-command counts are asserted.
+		const count = (name: string) => commands.filter((args) => args.indexOf(name) !== -1).length;
+		expect(count('status')).toBe(1);
+		expect(count('log')).toBe(1);
+		expect(spawns).toBeLessThanOrEqual(5);
 	});
 
 	/* 10. Commit Details View: the three Git commands of the details load run concurrently */

@@ -11,7 +11,20 @@
 	font-size:13px;
 	line-height:17px;
 	z-index:41;
-	box-shadow:0 0 30px 5px var(--vscode-widget-shadow);
+	box-shadow:var(--gg-shadow-3, 0 0 30px 5px var(--vscode-widget-shadow));
+	animation:dialogEnter var(--gg-dur-modal, 220ms) var(--gg-ease, cubic-bezier(0.215, 0.61, 0.355, 1));
+}
+@keyframes dialogEnter{
+	from{ opacity:0; transform:translateX(-50%) translateY(8px) scale(0.96); }
+	to{ opacity:1; transform:translateX(-50%); }
+}
+.dialog.closing{
+	animation:dialogExit calc(var(--gg-dur-modal, 220ms) * 0.8) var(--gg-ease-in-out, ease) forwards;
+	pointer-events:none;
+}
+@keyframes dialogExit{
+	from{ opacity:1; transform:translateX(-50%); }
+	to{ opacity:0; transform:translateX(-50%) translateY(6px) scale(0.97); }
 }
 body.vscode-high-contrast .dialog{
 	border-color:var(--vscode-menu-border, rgba(128,128,128,0.5));
@@ -176,14 +189,40 @@ body.vscode-high-contrast .dialog{
 }
 
 .dialog svg{
-	display:inline;
+	display:inline-block;
+	vertical-align:middle;
 	fill:var(--vscode-menu-foreground);
 	opacity:0.75;
-	vertical-align:sub;
 }
 
 .dialog .dialogAlert svg, .dialog .actionRunning svg{
 	margin-right:8px;
+}
+
+.dialog .dialogAlert.warning{
+	color:var(--vscode-errorForeground, #f48771);
+}
+.dialog .dialogAlert.warning svg{
+	fill:var(--vscode-errorForeground, #f48771);
+	opacity:1;
+}
+.dialog .dataLossMascot{
+	margin-top:12px;
+	text-align:center;
+	-webkit-user-select:none;
+	user-select:none;
+}
+.dialog .dataLossMascot img{
+	display:block;
+	margin:0 auto;
+	max-width:150px;
+	max-height:150px;
+	border-radius:8px;
+}
+.dialog .dataLossMascotCaption{
+	margin-top:6px;
+	font-weight:bold;
+	color:var(--vscode-errorForeground, #f48771);
 }
 
 .dialog .dialogInfo{
@@ -207,7 +246,7 @@ body.vscode-high-contrast .dialog{
 	width:15px !important;
 	height:20px !important;
 	margin-top:2px;
-	vertical-align:top;
+	vertical-align:middle;
 	animation:loadingIconAnimation 2s linear infinite;
 }
 
@@ -281,6 +320,8 @@ body.vscode-high-contrast .dialog{
 	z-index:42;
 	text-align:left;
 	overflow-y:auto;
+	box-shadow:var(--gg-shadow-1, 0 1px 4px 1px var(--vscode-widget-shadow));
+	animation:ggFadeIn var(--gg-dur-fast, 120ms) var(--gg-ease, ease-out);
 }
 
 .customSelectOption{

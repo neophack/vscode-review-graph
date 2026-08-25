@@ -7,7 +7,7 @@ import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { GerritDataSource } from './gerrit';
 import { Logger } from './logger';
-import { ActionedUser, CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { ActionedUser, CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitLineCounts, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, LossWarning, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, isSafeRefName, isSafeStashSelector, isValidCommitHash, openGitTerminal, pathWithTrailingSlash, quoteShellArg, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { GgEvent } from './utils/event';
@@ -28,6 +28,12 @@ const REF_SNAPSHOT_CACHE_MS = 3000;
 
 /** The maximum number of refs peeled by a single `rev-parse` process. */
 const PEEL_REFS_BATCH_SIZE = 200;
+
+/**
+ * The hash of Git's empty tree object, used as the diff base of a root commit (whose files then
+ * report as added rather than being unaccounted for).
+ */
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 export const enum GitConfigKey {
 	DiffGuiTool = 'diff.guitool',
@@ -62,6 +68,12 @@ export class DataSource extends Disposable {
 	private readonly configCache = new Map<string, { remotesSignature: string, promise: Promise<GitRepoConfigData> }>();
 	/** Cache of the refs of each repository, to avoid repeated ref scans on every view load. */
 	private readonly refSnapshotCache = new Map<string, { key: string, expiresAt: number, promise: Promise<GitRefSnapshot> }>();
+	/**
+	 * The `+N/-M` line counts of the last diff whose counts were computed. A details load settles
+	 * its file list's counts in batches, and a diff between two fixed revisions cannot change
+	 * under the cache, so every batch after the first settles from memory.
+	 */
+	private numStatCache: { repo: string, from: string | null, to: string, counts: { [path: string]: GitLineCounts } } | null = null;
 
 	/**
 	 * Check that values received from an untrusted source (the webview) are safe to be passed to
@@ -526,6 +538,11 @@ export class DataSource extends Disposable {
 
 	/**
 	 * Get the commit details for the Commit Details View.
+	 *
+	 * The `+N/-M` line counts are deliberately NOT computed here: every file's counts cost two
+	 * blob reads, which dominates the load of a many-file commit. The file list is returned with
+	 * statuses only and the view settles the counts afterwards, a viewport at a time, through
+	 * `getCommitFileCounts`.
 	 * @param repo The path of the repository.
 	 * @param commitHash The hash of the commit open in the Commit Details View.
 	 * @param hasParents Does the commit have parents
@@ -535,10 +552,9 @@ export class DataSource extends Disposable {
 		const fromCommit = commitHash + (hasParents ? '^' : '');
 		return Promise.all([
 			this.getCommitDetailsBase(repo, commitHash),
-			this.getDiffNameStatus(repo, fromCommit, commitHash),
-			this.getDiffNumStat(repo, fromCommit, commitHash)
+			this.getDiffNameStatus(repo, fromCommit, commitHash)
 		]).then((results) => {
-			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
+			results[0].fileChanges = generateFileChanges(results[1], [], null);
 			return { commitDetails: results[0], error: null };
 		}).catch((errorMessage) => {
 			return { commitDetails: null, error: errorMessage };
@@ -546,7 +562,83 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Get the `+N/-M` line counts of the given paths of the diff that the open Commit Details /
+	 * Commit Comparison view is showing, as `git diff --numstat` reports them.
+	 *
+	 * The counts cannot be limited to the asked-for paths by a pathspec: a rename's old path would
+	 * fall outside the limit, so the pair would never be made and a moved file would count as a
+	 * wholesale addition. The whole diff is counted instead — the cost the eager load used to pay
+	 * before the file list could render at all — and kept for the batches that follow, which
+	 * settle from memory.
+	 * @param repo The path of the repository.
+	 * @param from The diff's left side, or null to diff `to` against its first parent (a plain commit).
+	 * @param to The diff's right side.
+	 * @param paths The paths to count, keyed by each file's new path.
+	 * @returns The counts of the requested paths; a binary file reports null counts.
+	 */
+	public getCommitFileCounts(repo: string, from: string | null, to: string, paths: ReadonlyArray<string>): Promise<GitCommitFileCountsData> {
+		if (paths.length === 0) return Promise.resolve({ counts: {}, error: null });
+		if ((from !== null && !isValidCommitHash(from)) || !isValidCommitHash(to)) {
+			return Promise.resolve({ counts: {}, error: 'An invalid revision was requested.' });
+		}
+		return this.numStatCounts(repo, from, to).then((counts) => {
+			const wanted: { [path: string]: GitLineCounts } = {};
+			for (let i = 0; i < paths.length; i++) {
+				const counted = counts[paths[i]];
+				if (typeof counted !== 'undefined') wanted[paths[i]] = counted;
+			}
+			return { counts: wanted, error: null };
+		}).catch((errorMessage) => {
+			return { counts: {}, error: errorMessage };
+		});
+	}
+
+	/**
+	 * The numstat counts of a whole diff, keyed by each file's new path, served from the
+	 * single-entry cache whenever the same diff is asked for again.
+	 */
+	private numStatCounts(repo: string, from: string | null, to: string): Promise<{ [path: string]: GitLineCounts }> {
+		if (this.numStatCache !== null && this.numStatCache.repo === repo && this.numStatCache.from === from && this.numStatCache.to === to) {
+			return Promise.resolve(this.numStatCache.counts);
+		}
+
+		// null => the commit's first parent — or, for a root commit (whose `to^` cannot be
+		// resolved), the empty tree, whose files then report as added
+		const base = from !== null
+			? Promise.resolve(from)
+			: this.spawnGit(['rev-parse', '--verify', '-q', to + '^'], repo, (stdout) => stdout.trim()).catch(() => '');
+		return base.then((resolvedBase) => {
+			return this.spawnGit(['diff', '--numstat', '--find-renames', '-z', resolvedBase !== '' ? resolvedBase : EMPTY_TREE, to], repo, (stdout) => {
+				const counts: { [path: string]: GitLineCounts } = {};
+				const fields = stdout.split('\0');
+				for (let i = 0; i < fields.length && fields[i] !== '';) {
+					const parts = fields[i].split('\t');
+					if (parts.length !== 3) break;
+					// A rename's numstat record has an empty path, followed by the two paths as separate
+					// NUL-terminated fields; the new path (the last one) is what the counts are keyed by.
+					const filePath = parts[2] !== '' ? parts[2] : fields[i + 2];
+					const additions = parseInt(parts[0], 10);
+					const deletions = parseInt(parts[1], 10);
+					counts[filePath] = {
+						// A binary file reports a dash, which parses to NaN and is reported as unknown
+						additions: Number.isNaN(additions) ? null : additions,
+						deletions: Number.isNaN(deletions) ? null : deletions
+					};
+					i += parts[2] !== '' ? 1 : 3;
+				}
+				this.numStatCache = { repo: repo, from: from, to: to, counts: counts };
+				return counts;
+			});
+		});
+	}
+
+	/**
 	 * Get the stash details for the Commit Details View.
+	 *
+	 * As with `getCommitDetails`, the line counts of the stash's own diff are settled afterwards
+	 * through `getCommitFileCounts` (against the stash's base). The counts of the untracked files
+	 * are computed here: they cannot be asked for through the same diff, and their numstat is
+	 * cheap (new blobs only).
 	 * @param repo The path of the repository.
 	 * @param commitHash The hash of the stash commit open in the Commit Details View.
 	 * @param stash The stash.
@@ -556,13 +648,12 @@ export class DataSource extends Disposable {
 		return Promise.all([
 			this.getCommitDetailsBase(repo, commitHash),
 			this.getDiffNameStatus(repo, stash.baseHash, commitHash),
-			this.getDiffNumStat(repo, stash.baseHash, commitHash),
 			stash.untrackedFilesHash !== null ? this.getDiffNameStatus(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([]),
 			stash.untrackedFilesHash !== null ? this.getDiffNumStat(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([])
 		]).then((results) => {
-			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
+			results[0].fileChanges = generateFileChanges(results[1], [], null);
 			if (stash.untrackedFilesHash !== null) {
-				generateFileChanges(results[3], results[4], null).forEach((fileChange) => {
+				generateFileChanges(results[2], results[3], null).forEach((fileChange) => {
 					if (fileChange.type === GitFileStatus.Added) {
 						fileChange.type = GitFileStatus.Untracked;
 						results[0].fileChanges.push(fileChange);
@@ -577,24 +668,31 @@ export class DataSource extends Disposable {
 
 	/**
 	 * Get the uncommitted details for the Commit Details View.
+	 *
+	 * Unlike a commit's details, the line counts are computed here: the diff's right side is the
+	 * working tree, which cannot be cached and is usually small. An unborn HEAD (a fresh
+	 * repository with no commits) cannot be diffed against at all — everything the status scan
+	 * reports (untracked files) is then the whole difference.
 	 * @param repo The path of the repository.
 	 * @returns The uncommitted details.
 	 */
 	public getUncommittedDetails(repo: string): Promise<GitCommitDetailsData> {
-		return Promise.all([
-			this.getDiffNameStatus(repo, 'HEAD', ''),
-			this.getDiffNumStat(repo, 'HEAD', ''),
-			this.getStatus(repo)
-		]).then((results) => {
-			return {
-				commitDetails: {
-					hash: UNCOMMITTED, parents: [],
-					author: '', authorEmail: '', authorDate: 0,
-					committer: '', committerEmail: '', committerDate: 0, signature: null,
-					body: '', fileChanges: generateFileChanges(results[0], results[1], results[2])
-				},
-				error: null
-			};
+		return this.spawnGit(['rev-parse', '--verify', '--quiet', 'HEAD'], repo, () => true).catch(() => false).then((headExists) => {
+			return Promise.all([
+				headExists ? this.getDiffNameStatus(repo, 'HEAD', '') : Promise.resolve([]),
+				headExists ? this.getDiffNumStat(repo, 'HEAD', '') : Promise.resolve([]),
+				this.getStatus(repo)
+			]).then((results) => {
+				return {
+					commitDetails: {
+						hash: UNCOMMITTED, parents: [],
+						author: '', authorEmail: '', authorDate: 0,
+						committer: '', committerEmail: '', committerDate: 0, signature: null,
+						body: '', fileChanges: generateFileChanges(results[0], results[1], results[2])
+					},
+					error: null
+				};
+			});
 		}).catch((errorMessage) => {
 			return { commitDetails: null, error: errorMessage };
 		});
@@ -602,16 +700,21 @@ export class DataSource extends Disposable {
 
 	/**
 	 * Get the comparison details for the Commit Comparison View.
+	 *
+	 * When both sides are fixed revisions the line counts are settled afterwards through
+	 * `getCommitFileCounts`; only a comparison against the working tree computes them here (see
+	 * `getUncommittedDetails`).
 	 * @param repo The path of the repository.
 	 * @param fromHash The commit hash the comparison is from.
 	 * @param toHash The commit hash the comparison is to.
 	 * @returns The comparison details.
 	 */
 	public getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitCommitComparisonData> {
+		const againstWorktree = toHash === UNCOMMITTED;
 		return Promise.all([
-			this.getDiffNameStatus(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
-			this.getDiffNumStat(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
-			toHash === UNCOMMITTED ? this.getStatus(repo) : Promise.resolve(null)
+			this.getDiffNameStatus(repo, fromHash, againstWorktree ? '' : toHash),
+			againstWorktree ? this.getDiffNumStat(repo, fromHash, '') : Promise.resolve([]),
+			againstWorktree ? this.getStatus(repo) : Promise.resolve(null)
 		]).then((results) => {
 			return {
 				fileChanges: generateFileChanges(results[0], results[1], results[2]),
@@ -627,10 +730,13 @@ export class DataSource extends Disposable {
 	 * @param repo The path of the repository.
 	 * @param commitHash The commit hash specifying the revision of the file.
 	 * @param filePath The path of the file relative to the repositories root.
-	 * @returns The file contents.
+	 * @returns The file contents, or NULL when the file is binary.
 	 */
-	public getCommitFile(repo: string, commitHash: string, filePath: string) {
-		return this._spawnGit(['show', '--textconv', commitHash + ':' + filePath], repo, stdout => {
+	public getCommitFile(repo: string, commitHash: string, filePath: string): Promise<string | null> {
+		return this._spawnGit(['show', '--textconv', commitHash + ':' + filePath], repo, (stdout) => {
+			// A NUL byte in the first 8000 bytes marks a binary file, whose contents cannot be
+			// meaningfully decoded
+			if (stdout.subarray(0, 8000).includes(0)) return null;
 			const encoding = getConfig(repo).fileEncoding;
 			return decode(stdout, encodingExists(encoding) ? encoding : 'utf8');
 		});
@@ -730,11 +836,12 @@ export class DataSource extends Disposable {
 		const ref = 'refs/tags/' + tagName;
 		return this.spawnGit(['for-each-ref', ref, '--format=' + ['%(objectname)', '%(taggername)', '%(taggeremail)', '%(taggerdate:unix)', '%(contents:signature)', '%(contents)'].join(GIT_LOG_SEPARATOR)], repo, (stdout) => {
 			const data = stdout.split(GIT_LOG_SEPARATOR);
+			const taggerDate = parseInt(data[3]);
 			return {
 				hash: data[0],
 				taggerName: data[1],
 				taggerEmail: data[2].substring(data[2].startsWith('<') ? 1 : 0, data[2].length - (data[2].endsWith('>') ? 1 : 0)),
-				taggerDate: parseInt(data[3]),
+				taggerDate: Number.isNaN(taggerDate) ? 0 : taggerDate,
 				message: removeTrailingBlankLines(data.slice(5).join(GIT_LOG_SEPARATOR).replace(data[4], '').split(EOL_REGEX)).join('\n'),
 				signed: data[4] !== ''
 			};
@@ -1116,15 +1223,59 @@ export class DataSource extends Disposable {
 	 * @param remoteBranch The name of the remote branch to check out (if not NULL).
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public checkoutBranch(repo: string, branchName: string, remoteBranch: string | null) {
+	public async checkoutBranch(repo: string, branchName: string, remoteBranch: string | null, confirmed: boolean = false): Promise<ErrorInfo | LossWarning> {
 		const unsafeArgs = DataSource.checkUnsafeGitArgs(['branchName', branchName, 'ref'], ['remoteBranch', remoteBranch, 'ref']);
-		if (unsafeArgs !== null) return Promise.resolve(unsafeArgs);
+		if (unsafeArgs !== null) return unsafeArgs;
+		if (!confirmed) {
+			const warning = await this.detachedCommitsLossWarning(repo);
+			if (warning !== null) return warning;
+		}
 
 		let args = ['checkout'];
 		if (remoteBranch === null) args.push(branchName);
 		else args.push('-b', branchName, remoteBranch);
 
 		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * The data-loss warning for moving HEAD away from detached commits that no ref or stash
+	 * keeps reachable, or NULL when nothing can be lost. Such commits are left behind,
+	 * recoverable from the local reflog only until git gc prunes them.
+	 * @param anchoredAt A revision that, when it is the current HEAD, anchors the detached
+	 *                   commits (a branch being created right at HEAD): nothing is stranded.
+	 */
+	private async detachedCommitsLossWarning(repo: string, anchoredAt: string | null = null): Promise<LossWarning | null> {
+		if (anchoredAt !== null) {
+			const head = await this.spawnGit(['rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch(() => '');
+			if (head !== '' && head === anchoredAt) return null;
+		}
+		const count = await this.countDetachedOnlyCommits(repo);
+		if (count <= 0) return null;
+		const one = count === 1;
+		return {
+			message: 'HEAD is currently detached with <b>' + count + ' commit' + (one ? '' : 's') + '</b> that no branch, tag, remote or stash keeps reachable. Switching now leaves ' + (one ? 'it' : 'them') + ' behind, recoverable from the local reflog only until git gc prunes ' + (one ? 'it' : 'them') + '. Create a branch at HEAD to keep ' + (one ? 'it' : 'them') + ' (a stash made on ' + (one ? 'it' : 'them') + ' works too).'
+		};
+	}
+
+	/**
+	 * Count the commits that moving HEAD away from its current position would leave behind:
+	 * commits reachable from HEAD but from no branch, tag, remote or stash. Non-zero only while
+	 * HEAD is detached and has commits of its own.
+	 */
+	private async countDetachedOnlyCommits(repo: string): Promise<number> {
+		// A stash keeps its base commit's whole history reachable exactly as a branch does, so
+		// every stash entry counts as an anchor — not just the refs/stash tip: older entries live
+		// only in its reflog. (--all cannot stand in for the explicit roots: it includes HEAD
+		// itself, which would silence the guard entirely.) `git stash list` exits 0 with no
+		// output when nothing is stashed, so the fallback only masks a git that failed to run.
+		const stashRoots = await this.spawnGit(['stash', 'list', '--format=%H'], repo, (stdout) =>
+			stdout.split(EOL_REGEX).map((line) => line.trim()).filter((line) => line !== '')
+		).catch(() => <string[]>[]);
+		const count = await this.spawnGit(['rev-list', 'HEAD', '--not', '--branches', '--tags', '--remotes', ...stashRoots, '--count'], repo, (stdout) =>
+			parseInt(stdout, 10)
+		).catch(() => 0);
+		return Number.isNaN(count) ? 0 : count;
 	}
 
 	/**
@@ -1136,9 +1287,20 @@ export class DataSource extends Disposable {
 	 * @param force Force create the branch, replacing an existing branch with the same name (if it exists).
 	 * @returns The ErrorInfo's from the executed command(s).
 	 */
-	public async createBranch(repo: string, branchName: string, commitHash: string, checkout: boolean, force: boolean) {
+	public async createBranch(repo: string, branchName: string, commitHash: string, checkout: boolean, force: boolean, confirmed: boolean = false): Promise<(ErrorInfo | LossWarning)[]> {
 		const unsafeArgs = DataSource.checkUnsafeGitArgs(['branchName', branchName, 'ref'], ['commitHash', commitHash, 'hash']);
 		if (unsafeArgs !== null) return [unsafeArgs];
+
+		// `checkout -b` moves HEAD to the new branch: when it points anywhere other than the
+		// current HEAD, a detached position's own commits are stranded exactly as by a checkout.
+		// The guard must run before ANY command whatever `force` is: with force the checkout runs
+		// as a second step, and a warning returned there would sit at statuses[1] — behind the
+		// successful branch creation — where the view's warning forwarding (which reads the first
+		// element) would miss it and show the warning object as an error string instead.
+		if (checkout && !confirmed) {
+			const warning = await this.detachedCommitsLossWarning(repo, commitHash);
+			if (warning !== null) return [warning];
+		}
 
 		const args = [];
 		if (checkout && !force) {
@@ -1151,9 +1313,10 @@ export class DataSource extends Disposable {
 		}
 		args.push(branchName, commitHash);
 
-		const statuses = [await this.runGitCommand(args, repo)];
+		const statuses: (ErrorInfo | LossWarning)[] = [await this.runGitCommand(args, repo)];
 		if (statuses[0] === null && checkout && force) {
-			statuses.push(await this.checkoutBranch(repo, branchName, null));
+			// Already confirmed: the detached-commits guard above has assessed this very checkout
+			statuses.push(await this.checkoutBranch(repo, branchName, null, true));
 		}
 		return statuses;
 	}
@@ -1371,9 +1534,13 @@ export class DataSource extends Disposable {
 	 * @param commitHash The hash of the commit to check out.
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public checkoutCommit(repo: string, commitHash: string) {
+	public async checkoutCommit(repo: string, commitHash: string, confirmed: boolean = false): Promise<ErrorInfo | LossWarning> {
 		const unsafeArgs = DataSource.checkUnsafeGitArgs(['commitHash', commitHash, 'hash']);
-		if (unsafeArgs !== null) return Promise.resolve(unsafeArgs);
+		if (unsafeArgs !== null) return unsafeArgs;
+		if (!confirmed) {
+			const warning = await this.detachedCommitsLossWarning(repo);
+			if (warning !== null) return warning;
+		}
 
 		return this.runGitCommand(['checkout', commitHash], repo);
 	}
@@ -1897,13 +2064,15 @@ export class DataSource extends Disposable {
 			while (i < output.length && output[i] !== '') {
 				let fields = output[i].split('\t');
 				if (fields.length !== 3) break;
+				// A binary file reports a dash for both counts, which parses to NaN
+				const additions = parseInt(fields[0]), deletions = parseInt(fields[1]);
 				if (fields[2] !== '') {
 					// Add, Modify, or Delete
-					records.push({ filePath: getPathFromStr(fields[2]), additions: parseInt(fields[0]), deletions: parseInt(fields[1]) });
+					records.push({ filePath: getPathFromStr(fields[2]), additions: isNaN(additions) ? null : additions, deletions: isNaN(deletions) ? null : deletions });
 					i += 1;
 				} else {
 					// Rename
-					records.push({ filePath: getPathFromStr(output[i + 2]), additions: parseInt(fields[0]), deletions: parseInt(fields[1]) });
+					records.push({ filePath: getPathFromStr(output[i + 2]), additions: isNaN(additions) ? null : additions, deletions: isNaN(deletions) ? null : deletions });
 					i += 3;
 				}
 			}
@@ -2136,12 +2305,12 @@ export class DataSource extends Disposable {
 
 		/* HEAD, the local branches and the local tags */
 		const localLines = local.split(EOL_REGEX);
-		for (let i = 0; i < localLines.length - 1; i++) {
-			const line = localLines[i].split(' ');
-			if (line.length < 2) continue;
+		for (let i = 0; i < localLines.length; i++) {
+			const separator = localLines[i].indexOf(' ');
+			if (separator === -1) continue;
 
-			const hash = line.shift()!;
-			const ref = line.join(' ');
+			const hash = localLines[i].substring(0, separator);
+			const ref = localLines[i].substring(separator + 1);
 
 			if (ref.startsWith('refs/heads/')) {
 				const name = ref.substring(11);
@@ -2352,8 +2521,9 @@ export class DataSource extends Disposable {
 	 */
 	public getUncommittedChanges(repo: string) {
 		return this.spawnGit(['status', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain'], repo, (stdout) => {
-			const numLines = stdout.split(EOL_REGEX).length;
-			return numLines > 1 ? numLines - 1 : 0;
+			// An output without a trailing newline (the last entry of a truncated status) must
+			// still count as a line
+			return stdout.split(EOL_REGEX).filter((line) => line !== '').length;
 		});
 	}
 
@@ -2640,8 +2810,8 @@ interface DiffNameStatusRecord {
 
 interface DiffNumStatRecord {
 	filePath: string;
-	additions: number;
-	deletions: number;
+	additions: number | null;
+	deletions: number | null;
 }
 
 interface GitBranchData {
@@ -2669,6 +2839,11 @@ export interface GitCommitData {
 
 export interface GitCommitDetailsData {
 	commitDetails: GitCommitDetails | null;
+	error: ErrorInfo;
+}
+
+export interface GitCommitFileCountsData {
+	counts: { [path: string]: GitLineCounts };
 	error: ErrorInfo;
 }
 

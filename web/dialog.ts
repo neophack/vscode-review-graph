@@ -231,10 +231,12 @@ class Dialog {
 			return '<tr' + (input.type === DialogInputType.Radio ? ' class="mediumField"' : input.type !== DialogInputType.Checkbox ? ' class="largeField"' : '') + '>' + (multiElement && !multiCheckbox ? '<td>' + input.name + ': </td>' : '') + inputHtml + '</tr>';
 		});
 
-		const html = message + (includeLineBreak ? '<br>' : '') +
-			'<table class="dialogForm ' + (multiElement ? multiCheckbox ? 'multiCheckbox' : 'multi' : 'single') + '">' +
-			inputRowsHtml.join('') +
-			'</table>';
+		const html = inputs.length > 0
+			? message + (includeLineBreak ? '<br>' : '') +
+				'<table class="dialogForm ' + (multiElement ? multiCheckbox ? 'multiCheckbox' : 'multi' : 'single') + '">' +
+				inputRowsHtml.join('') +
+				'</table>'
+			: message;
 
 		const areFormValuesInvalid = () => this.elem === null || this.elem.classList.contains(CLASS_DIALOG_NO_INPUT) || this.elem.classList.contains(CLASS_DIALOG_INPUT_INVALID);
 		const getFormValues = () => inputs.map((input, index) => {
@@ -358,6 +360,23 @@ class Dialog {
 	}
 
 	/**
+	 * Show a warning dialog about an operation that can cause the user to lose data, requiring
+	 * them to explicitly acknowledge the risk before the operation is performed.
+	 * @param riskHtml The HTML describing the data loss risk of the operation.
+	 * @param actioned A callback to be invoked if the user accepts the risk.
+	 */
+	public showDataLossWarning(riskHtml: string, actioned: () => void) {
+		this.show(DialogType.Form,
+			'<span class="dialogAlert warning">' + SVG_ICONS.alert + escapeHtml(strings.dataLossDialogTitle) + '</span>' +
+			'<br><span class="messageContent">' + riskHtml + '</span>' +
+			'<div class="dataLossMascot"><img src="' + DATA_LOSS_WARNING_IMAGE + '" alt="' + escapeHtml(strings.dataLossDialogTitle) + '"><div class="dataLossMascotCaption">' + escapeHtml(strings.dataLossMascotCaption) + '</div></div>',
+			strings.dataLossContinue, strings.dialogCancel, () => {
+				this.close();
+				actioned();
+			}, null, null);
+	}
+
+	/**
 	 * Show a dialog to indicate that an action is currently running.
 	 * @param action A short name that identifies the action that is running.
 	 */
@@ -377,6 +396,8 @@ class Dialog {
 	 */
 	private show(type: DialogType, html: string, actionName: string | null, secondaryActionName: string, actioned: (() => void) | null, secondaryActioned: (() => void) | null, target: DialogTarget | null) {
 		closeDialogAndContextMenu();
+		// A dialog being replaced is fading out: remove it immediately so it doesn't overlap the new one
+		Array.prototype.forEach.call(document.querySelectorAll('.dialog.closing'), (elem: Element) => elem.remove());
 
 		this.type = type;
 		this.target = target;
@@ -413,7 +434,9 @@ class Dialog {
 	public close() {
 		eventOverlay.remove();
 		if (this.elem !== null) {
-			this.elem.remove();
+			const elem = this.elem;
+			elem.classList.add('closing');
+			window.setTimeout(() => elem.remove(), 180);
 			this.elem = null;
 		}
 		alterClassOfCollection(<HTMLCollectionOf<HTMLElement>>document.getElementsByClassName(CLASS_DIALOG_ACTIVE), CLASS_DIALOG_ACTIVE, false);

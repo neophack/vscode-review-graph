@@ -682,6 +682,26 @@ export interface ResponseWithMultiErrorInfo extends BaseMessage {
 
 export type ErrorInfo = string | null; // null => no error, otherwise => error message
 
+/**
+ * A data-loss warning an action returns instead of running: the view shows it through its
+ * standard warning dialog (the mascot image above the message), and re-sends the action with
+ * its confirmed flag set once the user insists.
+ */
+export interface LossWarning {
+	/** The warning text (may contain HTML, like the view's own risk descriptions). */
+	readonly message: string;
+}
+
+/**
+ * A data-loss warning for the view: the standard warning dialog shows `message`; confirming
+ * re-sends `retry` — the original request with `confirmed` set.
+ */
+export interface ResponseLossWarning {
+	readonly command: 'lossWarning';
+	readonly message: string;
+	readonly retry: RequestMessage;
+}
+
 export const enum ErrorInfoExtensionPrefix {
 	PushTagCommitNotOnRemote = 'VSCODE_GIT_GRAPH:PUSH_TAG:COMMIT_NOT_ON_REMOTE:'
 }
@@ -736,6 +756,8 @@ export interface ResponseBranchFromStash extends ResponseWithErrorInfo {
 }
 
 export interface RequestCheckoutBranch extends RepoRequest {
+	/** Set when the view already showed the data-loss warning and the user insisted. */
+	readonly confirmed?: boolean;
 	readonly command: 'checkoutBranch';
 	readonly branchName: string;
 	readonly remoteBranch: string | null;
@@ -755,6 +777,8 @@ export interface ResponseCheckoutBranch extends ResponseWithMultiErrorInfo {
 }
 
 export interface RequestCheckoutCommit extends RepoRequest {
+	/** Set when the view already showed the data-loss warning and the user insisted. */
+	readonly confirmed?: boolean;
 	readonly command: 'checkoutCommit';
 	readonly commitHash: string;
 }
@@ -806,6 +830,35 @@ export interface ResponseCommitBodies {
 	readonly bodies: { [hash: string]: string };
 }
 
+/**
+ * The line counts of specific files of the open Commit Details / Commit Comparison view, which
+ * computes its file list first and settles the `+N/-M` counts progressively — the visible files
+ * first, then the rest in the background.
+ */
+export interface RequestCommitFileCounts extends RepoRequest {
+	readonly command: 'commitFileCounts';
+	/** The commit open in the view, echoed back so a stale reply can be dropped. */
+	readonly commitHash: string;
+	/** The second commit of an open comparison, or null when a single commit is open. */
+	readonly compareWithHash: string | null;
+	/** null => diff `to` against its first parent (a plain commit); string => the diff's left side. */
+	readonly from: string | null;
+	readonly to: string;
+	readonly paths: ReadonlyArray<string>;
+}
+export interface ResponseCommitFileCounts extends ResponseWithErrorInfo {
+	readonly command: 'commitFileCounts';
+	readonly commitHash: string;
+	readonly compareWithHash: string | null;
+	readonly counts: { [path: string]: GitLineCounts };
+}
+
+/** The `+N/-M` line counts of a file; NULL counts mean the file is binary (or the counts are unknown). */
+export interface GitLineCounts {
+	readonly additions: number | null;
+	readonly deletions: number | null;
+}
+
 export interface RequestCompareCommits extends RepoRequest {
 	readonly command: 'compareCommits';
 	readonly commitHash: string;
@@ -851,6 +904,8 @@ export interface ResponseCreateArchive extends ResponseWithErrorInfo {
 }
 
 export interface RequestCreateBranch extends RepoRequest {
+	/** Set when the view already showed the data-loss warning and the user insisted. */
+	readonly confirmed?: boolean;
 	readonly command: 'createBranch';
 	readonly commitHash: string;
 	readonly branchName: string;
@@ -1536,6 +1591,7 @@ export type RequestMessage =
 	| RequestCleanUntrackedFiles
 	| RequestCountCommitsBefore
 	| RequestCommitBodies
+	| RequestCommitFileCounts
 	| RequestCommitDetails
 	| RequestCompareCommits
 	| RequestCopyFilePath
@@ -1619,6 +1675,8 @@ export type ResponseMessage =
 	| ResponseCountCommitsBefore
 	| ResponseCompareCommits
 	| ResponseCommitBodies
+	| ResponseCommitFileCounts
+	| ResponseLossWarning
 	| ResponseCommitDetails
 	| ResponseCopyFilePath
 	| ResponseCopyToClipboard
