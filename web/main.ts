@@ -184,9 +184,8 @@ class GitGraphView {
 		});
 		this.renderRefreshButton();
 		if (prevState) {
-			// Restore the Gerrit controls state before they are initialised, so that the chip selections
-			// survive the Webview being reloaded (e.g. switching away from the panel and back). The
-			// status filter chips themselves persist in the repository's state instead.
+			// Restore the path filter before the repository is loaded, so it survives the Webview being
+			// reloaded (e.g. switching away from the panel and back)
 			if (prevState.commitPathFilter !== null && prevState.commitPathFilter !== undefined) this.commitPathFilter = prevState.commitPathFilter;
 		}
 		initGerritControls(this);
@@ -334,6 +333,9 @@ class GitGraphView {
 		this.currentRepo = repo;
 		this.currentRepoLoading = true;
 		this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[this.currentRepo].showRemoteBranchesV2);
+		// Resolve the Gerrit status filter before the commits are requested, so the initial
+		// loadCommits request already carries the repository's persisted filter
+		initGerritFilterChips(this);
 		this.maxCommits = this.config.initialLoadCommits;
 		this.gitConfig = null;
 		this.gitRemotes = [];

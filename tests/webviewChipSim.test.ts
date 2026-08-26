@@ -48,6 +48,7 @@ function makeState() {
 			cdvDivider: 50, cdvHeight: 50, columnWidths: null, commitOrdering: 'default', fileViewType: null, hideRemotes: [],
 			includeCommitsMentionedByReflogs: null, issueLinkingConfig: {}, lastImportAt: 0, name: 'repo',
 			onlyFollowFirstParent: null, onRepoLoadShowCheckedOutBranch: null, onRepoLoadShowSpecificBranches: null,
+			gerritStatusFilter: null,
 			pullRequestConfig: null, showRemoteBranches: false, showRemoteBranchesV2: null, showStashes: null,
 			showTags: null, workspaceFolderIndex: null
 		} },
@@ -86,7 +87,7 @@ function removeStaleListeners() {
 	for (const listener of recordedListeners.splice(0)) listener.target.removeEventListener(listener.type, listener.cb);
 }
 
-function loadWebview() {
+function loadWebview(state?: ReturnType<typeof makeState>) {
 	removeStaleListeners();
 	document.body.innerHTML = VIEW_HTML;
 	(globalThis as any).acquireVsCodeApi = () => ({
@@ -96,7 +97,7 @@ function loadWebview() {
 	});
 	const script = fs.readFileSync(path.join(__dirname, '..', 'media', 'out.min.js'), 'utf8');
 	// eslint-disable-next-line no-eval
-	eval('var initialState = ' + JSON.stringify(makeState()) + ', globalState = ' + JSON.stringify({ avatars: {} }) + ', workspaceState = ' + JSON.stringify({}) + ';\n' + script);
+	eval('var initialState = ' + JSON.stringify(state !== undefined ? state : makeState()) + ', globalState = ' + JSON.stringify({ avatars: {} }) + ', workspaceState = ' + JSON.stringify({}) + ';\n' + script);
 	window.dispatchEvent(new Event('load'));
 }
 
@@ -245,11 +246,16 @@ describe('Webview Gerrit chip simulation', () => {
 		expect(document.querySelector('.gitRef.gerrit')).not.toBeNull();
 		await new Promise((resolve) => setTimeout(resolve, 150)); // no debounced request must fire
 
-		// 3. The selection must have been persisted to the webview state
-		expect(webviewState.gerritStatusFilter).toEqual({ new: true, merged: true, abandoned: false, wip: false });
+		// 3. The selection must have been persisted to the repository's state
+		const stateMsg = sentMessages.filter((m) => m.command === 'setRepoState').pop();
+		expect(stateMsg).toBeDefined();
+		expect(stateMsg.state.gerritStatusFilter).toEqual({ new: true, merged: true, abandoned: false, wip: false });
 
-		// 4. Simulate the webview being reloaded (the panel was hidden and re-shown)
-		loadWebview();
+		// 4. Simulate the webview being reloaded (the panel was hidden and re-shown): the extension
+		// re-injects the current repository state - which now carries the persisted filter - into the view
+		const reloadedState = makeState();
+		reloadedState.repos[REPO].gerritStatusFilter = stateMsg.state.gerritStatusFilter;
+		loadWebview(reloadedState);
 
 		// 5. The chip must still be selected. The commit list (and with it the Gerrit badges) is
 		// NOT restored directly - the lightweight persisted state triggers a reload instead, so the

@@ -383,21 +383,29 @@ function initGerritControls(view: GitGraphView) {
 
 	}
 
+}
 
+
+
+/**
+ * Render the status filter chips for the current repository and resolve the active filter. Called
+ * from loadRepo (the current repository is not yet known when the static controls are initialised,
+ * and the initial loadCommits request must already carry the restored filter).
+ */
+function initGerritFilterChips(view: GitGraphView) {
 
 	const filterControl = document.getElementById('gerritFilterControl');
 
-	if (filterControl === null) return;
+	if (filterControl === null || !view.config.gerrit.enabled || !view.config.gerrit.showControlsBar) return;
 
-	// The selected chips persist in the repository's state, so reopening the view (or VS Code)
-	// restores them; NULL => the repository has no persisted selection, so the global config's
-	// default filter applies
+	// The selected chips persist in the repository's state, so loading a repository (initially, on a
+	// repo switch, or after the webview was reloaded) restores them; NULL => the repository has no
+	// persisted selection, so the global config's default filter applies
 	const repo = view.gitRepos[view.currentRepo];
-	view.gerritStatusFilter = view.gerritStatusFilter !== null
-		? view.gerritStatusFilter
-		: repo !== undefined && repo.gerritStatusFilter !== null && repo.gerritStatusFilter !== undefined
-			? repo.gerritStatusFilter
-			: Object.assign({}, view.config.gerrit.statusFilter);
+
+	view.gerritStatusFilter = repo !== undefined && repo.gerritStatusFilter !== null && repo.gerritStatusFilter !== undefined
+		? repo.gerritStatusFilter
+		: Object.assign({}, view.config.gerrit.statusFilter);
 
 	const chips: { status: keyof GG.GerritStatusFilter, label: string }[] = [
 
