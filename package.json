@@ -1,7 +1,7 @@
 {
 	"name": "review-graph",
 	"displayName": "%displayName%",
-	"version": "1.38.8",
+	"version": "1.38.9",
 	"publisher": "aucneon",
 	"author": {
 		"name": "aucneon"
